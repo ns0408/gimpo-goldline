@@ -393,7 +393,7 @@
                     <div class="weather-main">
                         <div class="weather-icon" id="kimpoIcon">☀️</div>
                         <div>
-                            <div class="weather-temp" id="kimpoTemp">--°C</div>
+                            <div class="weather-temp" id="kimpoTemp">정보없음</div>
                             <div class="weather-desc" id="kimpoDesc">로딩중...</div>
                         </div>
                     </div>
@@ -404,7 +404,7 @@
                     <div class="weather-main">
                         <div class="weather-icon" id="seoulIcon">☀️</div>
                         <div>
-                            <div class="weather-temp" id="seoulTemp">--°C</div>
+                            <div class="weather-temp" id="seoulTemp">정보없음음</div>
                             <div class="weather-desc" id="seoulDesc">로딩중...</div>
                         </div>
                     </div>
@@ -1299,7 +1299,7 @@ async function analyze() {
     // 날씨 정보 (간략하게 - 열차 시간 카드 안에 포함)
     const weatherData = selectedTimeWeatherData || getSimulatedWeather(h, m);
     const weatherIcon = weatherData.icon || getWeatherIcon(weatherData);
-    const temp = weatherData.temp ? `${weatherData.temp.toFixed(1)}°C` : '--°C';
+    const temp = weatherData.temp ? `${weatherData.temp.toFixed(1)}°C` : '정보없음';
     const desc = weatherData.description || getWeatherDescription(weatherData);
     const isSimulated = !selectedTimeWeatherData;
     
