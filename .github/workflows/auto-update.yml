@@ -22,7 +22,7 @@ jobs:
           echo "🚀 데이터 자동 업데이트 시작"
           
           # ⚠️ 본인의 Netlify URL로 변경!
-          NETLIFY_URL="https://your-app.netlify.app"
+          NETLIFY_URL="gimpo-goldline.netlify.app"
           
           # API 호출 (자동 모드 - 누락 자동 복구)
           response=$(curl -s -w "\n%{http_code}" "$NETLIFY_URL/.netlify/functions/auto-update?mode=auto")
