@@ -1,0 +1,19 @@
+{
+  "name": "gimpo-goldline-final",
+  "version": "2.0.0",
+  "description": "김포 골드라인 혼잡도 예측 - 최종 완성판",
+  "main": "index.html",
+  "scripts": {
+    "dev": "netlify dev",
+    "build": "echo 'No build required'",
+    "deploy": "netlify deploy --prod"
+  },
+  "dependencies": {
+    "node-fetch": "^2.6.7"
+  },
+  "devDependencies": {
+    "netlify-cli": "^17.0.0"
+  },
+  "author": "REAL KEEPER",
+  "license": "MIT"
+}

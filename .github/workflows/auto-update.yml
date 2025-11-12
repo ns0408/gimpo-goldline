@@ -1,0 +1,45 @@
+name: 김포 골드라인 자동 업데이트
+
+on:
+  # 매일 오후 1시 실행 (한국 시간)
+  schedule:
+    - cron: '0 4 * * *'
+  
+  # 수동 실행
+  workflow_dispatch:
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: 📅 현재 시간
+        run: |
+          echo "🕐 실행: $(TZ=Asia/Seoul date '+%Y-%m-%d %H:%M:%S KST')"
+      
+      - name: 🔄 자동 업데이트 실행
+        run: |
+          echo "🚀 데이터 자동 업데이트 시작"
+          
+          # ⚠️ 본인의 Netlify URL로 변경!
+          NETLIFY_URL="https://your-app.netlify.app"
+          
+          # API 호출 (자동 모드 - 누락 자동 복구)
+          response=$(curl -s -w "\n%{http_code}" "$NETLIFY_URL/.netlify/functions/auto-update?mode=auto")
+          
+          http_code=$(echo "$response" | tail -n1)
+          body=$(echo "$response" | head -n-1)
+          
+          echo "📊 상태: $http_code"
+          echo "📝 응답: $body"
+          
+          if [ $http_code -eq 200 ]; then
+            echo "✅ 성공!"
+          else
+            echo "❌ 실패"
+            exit 1
+          fi
+      
+      - name: 🎉 완료
+        if: success()
+        run: echo "✅ 완료: $(TZ=Asia/Seoul date '+%Y-%m-%d %H:%M:%S KST')"
