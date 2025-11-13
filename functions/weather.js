@@ -3,7 +3,7 @@
 
 // 캐시 저장소 (Cloudflare Workers KV 사용 가능하지만, 여기서는 메모리 캐시)
 const cache = new Map();
-const CACHE_DURATION = 30 * 60 * 1000; // 30분
+const CACHE_DURATION = 30 * 60 * 1000; // 2시간
 
 // GET 요청 처리
 export async function onRequestGet(context) {
@@ -54,9 +54,9 @@ export async function onRequestGet(context) {
         const day = String(kstNow.getDate()).padStart(2, '0');
         const hour = String(kstNow.getHours()).padStart(2, '0');
         
-        // 최근 2시간만 시도
-        const times = [];
-        for (let i = 0; i < 2; i++) {
+        // 최근 1시간만 시도 (속도 개선)
+const times = [];
+for (let i = 0; i < 1; i++) {
             let h = parseInt(hour) - i;
             if (h < 0) h += 24;
             times.push(`${year}${month}${day}${String(h).padStart(2, '0')}00`);
@@ -77,8 +77,8 @@ export async function onRequestGet(context) {
                 
                 promises.push(
                     fetch(weatherUrl, { 
-                        signal: AbortSignal.timeout(2000) // 2초 타임아웃
-                    })
+    signal: AbortSignal.timeout(1000) // 1초로 단축
+})
                         .then(response => response.text())
                         .then(textData => {
                             if (textData && textData.length > 100) {
