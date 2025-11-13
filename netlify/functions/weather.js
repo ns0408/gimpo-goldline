@@ -1,6 +1,6 @@
-const fetch = require('node-fetch');
+// netlify/functions/weather.js
+// Cloudflare Pages에서 Netlify Functions 호환 형식
 
-// 캐시 저장소 (30분간 유지)
 const cache = new Map();
 const CACHE_DURATION = 30 * 60 * 1000; // 30분
 
@@ -77,7 +77,9 @@ exports.handler = async (event, context) => {
                 const weatherUrl = `https://apihub.kma.go.kr/api/typ01/url/kma_sfctm2.php?tm=${tm}&stn=${stn}&help=0&authKey=${kmaApiKey}`;
                 
                 promises.push(
-                    fetch(weatherUrl, { timeout: 2000 }) // 2초로 단축
+                    fetch(weatherUrl, { 
+                        signal: AbortSignal.timeout(2000) 
+                    })
                         .then(response => response.text())
                         .then(textData => {
                             if (textData && textData.length > 100) {
@@ -188,17 +190,6 @@ function parseWeatherData(textData) {
 
         // 첫 번째 데이터 라인 사용 (가장 최근 데이터)
         const values = dataLines[0].trim().split(/\s+/);
-
-        // 기상청 데이터 포맷:
-        // 0: YYMMDDHHMI
-        // 1: STN (관측소)
-        // 2: WD (풍향)
-        // 3: WS (풍속)
-        // 11: TA (기온)
-        // 12: TD (이슬점)
-        // 13: HM (습도)
-        // 15: RN (강수량)
-        // 8: PS (해면기압)
 
         // 관측소
         if (values[1]) {
