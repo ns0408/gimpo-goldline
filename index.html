@@ -393,7 +393,7 @@
                     <div class="weather-main">
                         <div class="weather-icon" id="kimpoIcon">☀️</div>
                         <div>
-                            <div class="weather-temp" id="kimpoTemp">정보없음</div>
+                            <div class="weather-temp" id="kimpoTemp">--°C</div>
                             <div class="weather-desc" id="kimpoDesc">로딩중...</div>
                         </div>
                     </div>
@@ -404,7 +404,7 @@
                     <div class="weather-main">
                         <div class="weather-icon" id="seoulIcon">☀️</div>
                         <div>
-                            <div class="weather-temp" id="seoulTemp">정보없음</div>
+                            <div class="weather-temp" id="seoulTemp">--°C</div>
                             <div class="weather-desc" id="seoulDesc">로딩중...</div>
                         </div>
                     </div>
@@ -467,14 +467,6 @@
 // 날씨 API 설정
 // ============================================
 const KMA_API_KEY = 'Ubxg-7JUSNS8YPuyVLjUNQ'; // 기상청 API 키
-const KMA_API_URL = 'https://apihub.kma.go.kr/api/typ01/url/kma_sfctm2.php';
-
-const WEATHER_API_KEY = 'YOUR_API_KEY_HERE'; // OpenWeatherMap API 키를 여기에 입력하세요
-const GIMPO_LAT = 37.6158;
-const GIMPO_LON = 126.7159;
-const SEOUL_LAT = 37.5514;
-const SEOUL_LON = 126.8494;
-
 // 위치 정보
 const LOCATIONS = {
     kimpo: { lat: 37.6158, lon: 126.7158, name: '김포' },
@@ -855,56 +847,45 @@ function getSimulatedWeather(hour, minute) {
 // 날씨 데이터 가져오기
 // ============================================
 async function fetchWeather() {
-    if (WEATHER_API_KEY === 'YOUR_API_KEY_HERE') {
-        document.getElementById('kimpoDesc').textContent = 'API 키 필요';
-        document.getElementById('seoulDesc').textContent = 'API 키 필요';
-        return;
-    }
-    
     try {
-        // 김포 날씨
-        const gimpoResponse = await fetch(
-            `https://api.openweathermap.org/data/2.5/weather?lat=${GIMPO_LAT}&lon=${GIMPO_LON}&appid=${WEATHER_API_KEY}&units=metric&lang=kr`
-        );
-        const gimpoData = await gimpoResponse.json();
+        console.log('🌤️ 날씨 데이터 로딩 시작...');
         
-        // 서울 강서구 날씨
-        const seoulResponse = await fetch(
-            `https://api.openweathermap.org/data/2.5/weather?lat=${SEOUL_LAT}&lon=${SEOUL_LON}&appid=${WEATHER_API_KEY}&units=metric&lang=kr`
-        );
-        const seoulData = await seoulResponse.json();
+        // 김포 날씨 데이터 가져오기
+        const gimpoWeather = await fetchWeatherFromNetlify(LOCATIONS.kimpo.lat, LOCATIONS.kimpo.lon);
         
-        // 미세먼지 데이터
-        const gimpoAqiResponse = await fetch(
-            `https://api.openweathermap.org/data/2.5/air_pollution?lat=${GIMPO_LAT}&lon=${GIMPO_LON}&appid=${WEATHER_API_KEY}`
-        );
-        const gimpoAqi = await gimpoAqiResponse.json();
+        // 서울 강서구 날씨 데이터 가져오기
+        const seoulWeather = await fetchWeatherFromNetlify(LOCATIONS.seoul.lat, LOCATIONS.seoul.lon);
         
-        const seoulAqiResponse = await fetch(
-            `https://api.openweathermap.org/data/2.5/air_pollution?lat=${SEOUL_LAT}&lon=${SEOUL_LON}&appid=${WEATHER_API_KEY}`
-        );
-        const seoulAqi = await seoulAqiResponse.json();
+        if (!gimpoWeather || !seoulWeather) {
+            document.getElementById('kimpoDesc').textContent = '로드 실패';
+            document.getElementById('seoulDesc').textContent = '로드 실패';
+            return;
+        }
         
         // 김포 데이터 저장 (혼잡도 계산용)
         currentWeatherData.gimpo = {
-            temp: Math.round(gimpoData.main.temp),
-            weather: gimpoData.weather[0].main,
-            description: gimpoData.weather[0].description,
-            rain: gimpoData.rain ? gimpoData.rain['1h'] || 0 : 0,
-            snow: gimpoData.snow ? gimpoData.snow['1h'] || 0 : 0,
-            humidity: gimpoData.main.humidity,
-            aqi: gimpoAqi.list[0].components.pm10
+            temp: gimpoWeather.temp,
+            weather: gimpoWeather.description,
+            description: gimpoWeather.description,
+            rain: gimpoWeather.rain || 0,
+            snow: gimpoWeather.rainType && gimpoWeather.rainType.includes('눈') ? 1 : 0,
+            humidity: gimpoWeather.humidity,
+            aqi: gimpoWeather.air ? parseFloat(gimpoWeather.air.pm10) : 30,
+            icon: gimpoWeather.icon,
+            alerts: gimpoWeather.alerts || []
         };
         
         // 서울 데이터 저장 (표시용)
         currentWeatherData.seoul = {
-            temp: Math.round(seoulData.main.temp),
-            weather: seoulData.weather[0].main,
-            description: seoulData.weather[0].description,
-            rain: seoulData.rain ? seoulData.rain['1h'] || 0 : 0,
-            snow: seoulData.snow ? seoulData.snow['1h'] || 0 : 0,
-            humidity: seoulData.main.humidity,
-            aqi: seoulAqi.list[0].components.pm10
+            temp: seoulWeather.temp,
+            weather: seoulWeather.description,
+            description: seoulWeather.description,
+            rain: seoulWeather.rain || 0,
+            snow: seoulWeather.rainType && seoulWeather.rainType.includes('눈') ? 1 : 0,
+            humidity: seoulWeather.humidity,
+            aqi: seoulWeather.air ? parseFloat(seoulWeather.air.pm10) : 30,
+            icon: seoulWeather.icon,
+            alerts: seoulWeather.alerts || []
         };
         
         // 날씨 보정 계수 계산 (김포 날씨 기준)
@@ -914,8 +895,10 @@ async function fetchWeather() {
         updateWeatherUI('kimpo', currentWeatherData.gimpo);
         updateWeatherUI('seoul', currentWeatherData.seoul);
         
+        console.log('✅ 날씨 데이터 로딩 완료');
+        
     } catch (error) {
-        console.error('날씨 데이터 로드 실패:', error);
+        console.error('❌ 날씨 데이터 로드 실패:', error);
         document.getElementById('kimpoDesc').textContent = '로드 실패';
         document.getElementById('seoulDesc').textContent = '로드 실패';
     }
@@ -924,29 +907,46 @@ async function fetchWeather() {
 function updateWeatherUI(location, data) {
     const prefix = location === 'kimpo' ? 'kimpo' : 'seoul';
     
-    // 아이콘
-    const iconMap = {
-        'Clear': '☀️',
-        'Clouds': '☁️',
-        'Rain': '🌧️',
-        'Drizzle': '🌦️',
-        'Thunderstorm': '⛈️',
-        'Snow': '❄️',
-        'Mist': '🌫️',
-        'Fog': '🌫️'
-    };
-    document.getElementById(`${prefix}Icon`).textContent = iconMap[data.weather] || '🌤️';
+    // 아이콘 (API에서 받은 아이콘 사용)
+    if (data.icon) {
+        document.getElementById(`${prefix}Icon`).textContent = data.icon;
+    }
     
     // 온도
-    document.getElementById(`${prefix}Temp`).textContent = `${data.temp}°C`;
+    if (data.temp !== null && data.temp !== undefined) {
+        document.getElementById(`${prefix}Temp`).textContent = `${Math.round(data.temp)}°C`;
+    }
     
     // 설명
-    document.getElementById(`${prefix}Desc`).textContent = data.description;
+    if (data.description) {
+        document.getElementById(`${prefix}Desc`).textContent = data.description;
+    }
     
-    // 상세 정보
-    let detailText = `습도: ${data.humidity}% | 미세먼지: ${Math.round(data.aqi)}`;
-    if (data.rain > 0) detailText += ` | 강수: ${data.rain}mm/h`;
-    if (data.snow > 0) detailText += ` | 적설: ${data.snow}cm`;
+    // 상세 정보 (습도, 미세먼지, 강수량, 기상경보)
+    let detailText = '';
+    
+    if (data.humidity) {
+        detailText += `습도: ${Math.round(data.humidity)}%`;
+    }
+    
+    if (data.aqi) {
+        detailText += ` | 미세먼지: ${Math.round(data.aqi)}㎍/㎥`;
+    }
+    
+    if (data.rain && data.rain > 0) {
+        detailText += ` | 강수: ${data.rain}mm/h`;
+    }
+    
+    if (data.snow && data.snow > 0) {
+        detailText += ` | 적설: ${data.snow}cm`;
+    }
+    
+    // 기상경보가 있으면 표시
+    if (data.alerts && data.alerts.length > 0) {
+        const alertTexts = data.alerts.map(alert => alert.description || alert.type).join(', ');
+        detailText += ` | ⚠️ ${alertTexts}`;
+    }
+    
     document.getElementById(`${prefix}Detail`).textContent = detailText;
 }
 
@@ -1299,7 +1299,7 @@ async function analyze() {
     // 날씨 정보 (간략하게 - 열차 시간 카드 안에 포함)
     const weatherData = selectedTimeWeatherData || getSimulatedWeather(h, m);
     const weatherIcon = weatherData.icon || getWeatherIcon(weatherData);
-    const temp = weatherData.temp ? `${weatherData.temp.toFixed(1)}°C` : '정보없음';
+    const temp = weatherData.temp ? `${weatherData.temp.toFixed(1)}°C` : '--°C';
     const desc = weatherData.description || getWeatherDescription(weatherData);
     const isSimulated = !selectedTimeWeatherData;
     
