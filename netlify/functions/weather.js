@@ -15,69 +15,92 @@ exports.handler = async (event, context) => {
     }
 
     try {
-        const { datetime } = event.queryStringParameters || {};
+        const { lat, lon } = event.queryStringParameters || {};
         
-        // 새로운 기상청 APIHUB API KEY
-        const apiKey = 'fcIlOLe6RqCCJTi3ulag_A';
-        
-        // 김포 지역 기상관측소 코드 (김포: 201)
-        const stn = '201';
-        
-        // 날짜/시간 파라미터 처리
-        let targetDatetime;
-        if (datetime) {
-            // 사용자가 입력한 일시 (예: 2025-10-15 14:30)
-            targetDatetime = datetime.replace(/[-: ]/g, '');
-        } else {
-            // 현재 시간
-            const now = new Date();
-            now.setHours(now.getHours() + 9); // KST
-            targetDatetime = now.toISOString()
-                .slice(0, 16)
-                .replace(/[-:T]/g, '');
+        if (!lat || !lon) {
+            throw new Error('위도(lat)와 경도(lon) 파라미터가 필요합니다.');
         }
-        
-        // 시간자료 API URL
-        const weatherUrl = `https://apihub.kma.go.kr/api/typ01/url/kma_sfctm2.php?tm=${targetDatetime}&stn=${stn}&help=0&authKey=${apiKey}`;
-        
-        // 미세먼지 API (한국환경공단 - 기존 유지)
-        const airApiKey = 'Ubxg+7JUSNS8YPuyVLjUNQ';
-        const stationName = '김포';
-        const airUrl = `http://apis.data.go.kr/B552584/ArpltnInforInqireSvc/getMsrstnAcctoRltmMesureDnsty?serviceKey=${encodeURIComponent(airApiKey)}&returnType=json&numOfRows=1&pageNo=1&stationName=${encodeURIComponent(stationName)}&dataTerm=DAILY&ver=1.0`;
 
-        console.log('🌤️ 기상청 API 호출:', weatherUrl);
+        // API 키
+        const kmaApiKey = 'fcIlOLe6RqCCJTi3ulag_A';
+        const airApiKey = '076fe95cc0f5cdb0e84e4005e7349546816f968f6569c0ae64db2e216d6728c3';
         
-        // API 호출
-        const [weatherRes, airRes] = await Promise.all([
-            fetch(weatherUrl).then(r => r.text()),
-            fetch(airUrl).then(r => r.json()).catch(() => null)
+        // 위경도를 기상청 격자 좌표로 변환
+        const grid = convertToGrid(parseFloat(lat), parseFloat(lon));
+        
+        // 현재 시간 (KST)
+        const now = new Date();
+        const kstNow = new Date(now.getTime() + (9 * 60 * 60 * 1000));
+        
+        // 초단기실황은 매시간 30분에 생성되므로, 현재 시간 기준으로 조정
+        const baseDate = formatDate(kstNow);
+        const baseTime = formatTime(kstNow);
+        
+        console.log(`🌍 위치: (${lat}, ${lon}) → 격자: (${grid.nx}, ${grid.ny})`);
+        console.log(`📅 기준시간: ${baseDate} ${baseTime}`);
+
+        // 1. 기상청 초단기실황 API 호출
+        const weatherUrl = `https://apihub.kma.go.kr/api/typ01/url/dsp_spt_shrt.php?base_date=${baseDate}&base_time=${baseTime}&nx=${grid.nx}&ny=${grid.ny}&authKey=${kmaApiKey}`;
+        
+        // 2. 에어코리아 측정소 찾기
+        const nearbyStationUrl = `https://apis.data.go.kr/B552584/ArpltnInforInqireSvc/getNearbyMsrstnList?serviceKey=${airApiKey}&returnType=json&tmX=${lon}&tmY=${lat}&ver=1.0`;
+        
+        console.log('🌤️ 초단기실황 API 호출 중...');
+        console.log('🏭 측정소 조회 중...');
+        
+        // API 병렬 호출
+        const [weatherRes, stationRes] = await Promise.all([
+            fetch(weatherUrl).then(r => r.text()).catch(err => {
+                console.error('❌ 초단기실황 API 오류:', err);
+                return null;
+            }),
+            fetch(nearbyStationUrl).then(r => r.json()).catch(err => {
+                console.error('❌ 측정소 조회 오류:', err);
+                return null;
+            })
         ]);
 
-        console.log('✅ 기상청 응답:', weatherRes.substring(0, 200));
-
-        // 기상청 데이터 파싱 (고정폭 텍스트 포맷)
-        const weatherData = parseKMAData(weatherRes);
+        // 날씨 데이터 파싱
+        const weatherData = parseWeatherData(weatherRes);
+        
+        // 측정소 이름 추출
+        let stationName = '김포';
+        if (stationRes?.response?.body?.items?.[0]) {
+            stationName = stationRes.response.body.items[0].stationName;
+            console.log(`📍 가장 가까운 측정소: ${stationName}`);
+        }
+        
+        // 3. 미세먼지 실시간 데이터 조회
+        const airUrl = `https://apis.data.go.kr/B552584/ArpltnInforInqireSvc/getMsrstnAcctoRltmMesureDnsty?serviceKey=${airApiKey}&returnType=json&numOfRows=1&pageNo=1&stationName=${encodeURIComponent(stationName)}&dataTerm=DAILY&ver=1.0`;
+        
+        console.log('💨 미세먼지 데이터 조회 중...');
+        const airRes = await fetch(airUrl).then(r => r.json()).catch(() => null);
         const airData = parseAirData(airRes);
-        const alerts = await getWeatherAlerts();
+        
+        // 4. 기상특보 조회
+        console.log('⚠️ 기상특보 조회 중...');
+        const alerts = await getWeatherAlerts(kmaApiKey, lat, lon);
 
         return {
             statusCode: 200,
             headers,
             body: JSON.stringify({
                 success: true,
-                datetime: targetDatetime,
+                location: {
+                    lat: parseFloat(lat),
+                    lon: parseFloat(lon),
+                    grid: grid,
+                    station: stationName
+                },
                 weather: weatherData,
                 air: airData,
                 alerts: alerts,
-                location: {
-                    station: '김포',
-                    stn: stn
-                }
+                timestamp: kstNow.toISOString()
             })
         };
 
     } catch (error) {
-        console.error('❌ Weather API Error:', error);
+        console.error('❌ Weather Function Error:', error);
         
         return {
             statusCode: 500,
@@ -91,82 +114,156 @@ exports.handler = async (event, context) => {
     }
 };
 
-// 기상청 APIHUB 데이터 파싱 (고정폭 텍스트)
-function parseKMAData(textData) {
+// 위경도를 기상청 격자 좌표로 변환
+function convertToGrid(lat, lon) {
+    const RE = 6371.00877; // 지구 반경(km)
+    const GRID = 5.0; // 격자 간격(km)
+    const SLAT1 = 30.0; // 투영 위도1(degree)
+    const SLAT2 = 60.0; // 투영 위도2(degree)
+    const OLON = 126.0; // 기준점 경도(degree)
+    const OLAT = 38.0; // 기준점 위도(degree)
+    const XO = 43; // 기준점 X좌표(GRID)
+    const YO = 136; // 기준점 Y좌표(GRID)
+
+    const DEGRAD = Math.PI / 180.0;
+    const RADDEG = 180.0 / Math.PI;
+
+    const re = RE / GRID;
+    const slat1 = SLAT1 * DEGRAD;
+    const slat2 = SLAT2 * DEGRAD;
+    const olon = OLON * DEGRAD;
+    const olat = OLAT * DEGRAD;
+
+    let sn = Math.tan(Math.PI * 0.25 + slat2 * 0.5) / Math.tan(Math.PI * 0.25 + slat1 * 0.5);
+    sn = Math.log(Math.cos(slat1) / Math.cos(slat2)) / Math.log(sn);
+    let sf = Math.tan(Math.PI * 0.25 + slat1 * 0.5);
+    sf = Math.pow(sf, sn) * Math.cos(slat1) / sn;
+    let ro = Math.tan(Math.PI * 0.25 + olat * 0.5);
+    ro = re * sf / Math.pow(ro, sn);
+
+    let ra = Math.tan(Math.PI * 0.25 + (lat) * DEGRAD * 0.5);
+    ra = re * sf / Math.pow(ra, sn);
+    let theta = lon * DEGRAD - olon;
+    if (theta > Math.PI) theta -= 2.0 * Math.PI;
+    if (theta < -Math.PI) theta += 2.0 * Math.PI;
+    theta *= sn;
+
+    const x = Math.floor(ra * Math.sin(theta) + XO + 0.5);
+    const y = Math.floor(ro - ra * Math.cos(theta) + YO + 0.5);
+
+    return { nx: x, ny: y };
+}
+
+// 날짜 포맷 (YYYYMMDD)
+function formatDate(date) {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}${month}${day}`;
+}
+
+// 시간 포맷 (HHMM) - 초단기실황용
+function formatTime(date) {
+    let hour = date.getHours();
+    const minute = date.getMinutes();
+    
+    // 초단기실황은 매시 30분에 생성되므로, 40분 이전이면 이전 시간 사용
+    if (minute < 40) {
+        hour = hour - 1;
+        if (hour < 0) hour = 23;
+    }
+    
+    return String(hour).padStart(2, '0') + '00';
+}
+
+// 초단기실황 데이터 파싱
+function parseWeatherData(textData) {
     const data = {
         temp: null,
         humidity: null,
         rain: 0,
+        rainType: '없음',
         windSpeed: null,
-        pressure: null,
+        windDir: null,
         description: '정보 없음',
         icon: '❓'
     };
+
+    if (!textData) {
+        console.warn('⚠️ 초단기실황 데이터 없음');
+        return data;
+    }
 
     try {
         // 줄바꿈으로 분리
         const lines = textData.trim().split('\n');
         
         if (lines.length < 2) {
-            console.warn('⚠️ 기상청 데이터 형식 오류');
+            console.warn('⚠️ 초단기실황 데이터 형식 오류');
             return data;
         }
 
-        // 헤더와 데이터 행 분리
-        const header = lines[0].trim().split(/\s+/);
-        const values = lines[lines.length - 1].trim().split(/\s+/);
-
-        // 헤더-값 매핑
-        const dataMap = {};
-        header.forEach((key, index) => {
-            dataMap[key] = values[index];
+        // 초단기실황 응답은 카테고리별로 여러 줄
+        lines.slice(1).forEach(line => {
+            const values = line.trim().split(/\s+/);
+            if (values.length < 6) return;
+            
+            const category = values[4]; // 5번째 컬럼이 category
+            const obsValue = values[5]; // 6번째 컬럼이 obsrValue
+            
+            switch (category) {
+                case 'T1H': // 기온
+                    data.temp = parseFloat(obsValue);
+                    break;
+                case 'RN1': // 1시간 강수량
+                    data.rain = parseFloat(obsValue) || 0;
+                    break;
+                case 'REH': // 습도
+                    data.humidity = parseFloat(obsValue);
+                    break;
+                case 'PTY': // 강수형태 (0:없음, 1:비, 2:비/눈, 3:눈, 5:빗방울, 6:빗방울눈날림, 7:눈날림)
+                    const ptyCode = parseInt(obsValue);
+                    const ptyMap = {
+                        0: '없음',
+                        1: '비',
+                        2: '비/눈',
+                        3: '눈',
+                        5: '빗방울',
+                        6: '빗방울눈날림',
+                        7: '눈날림'
+                    };
+                    data.rainType = ptyMap[ptyCode] || '없음';
+                    break;
+                case 'WSD': // 풍속
+                    data.windSpeed = parseFloat(obsValue);
+                    break;
+                case 'VEC': // 풍향
+                    data.windDir = parseFloat(obsValue);
+                    break;
+            }
         });
 
-        console.log('📊 파싱된 기상 데이터:', dataMap);
+        console.log('📊 파싱된 날씨 데이터:', data);
 
-        // 온도 (TA)
-        if (dataMap['TA']) {
-            data.temp = parseFloat(dataMap['TA']);
-        }
-
-        // 습도 (HM)
-        if (dataMap['HM']) {
-            data.humidity = parseFloat(dataMap['HM']);
-        }
-
-        // 강수량 (RN) - 1시간 강수량
-        if (dataMap['RN']) {
-            const rain = parseFloat(dataMap['RN']);
-            data.rain = isNaN(rain) ? 0 : rain;
-        }
-
-        // 풍속 (WS)
-        if (dataMap['WS']) {
-            data.windSpeed = parseFloat(dataMap['WS']);
-        }
-
-        // 기압 (PS)
-        if (dataMap['PS']) {
-            data.pressure = parseFloat(dataMap['PS']);
-        }
-
-        // 날씨 상태 결정
-        if (data.rain > 0) {
-            if (data.temp < 0) {
-                data.description = '눈';
+        // 날씨 상태 및 아이콘 결정
+        if (data.rainType !== '없음') {
+            if (data.rainType.includes('눈')) {
+                data.description = data.rainType;
                 data.icon = '❄️';
-            } else if (data.rain < 1) {
-                data.description = '약한 비';
-                data.icon = '🌦️';
-            } else if (data.rain < 3) {
-                data.description = '비';
-                data.icon = '🌧️';
             } else {
-                data.description = '강한 비';
-                data.icon = '⛈️';
+                if (data.rain < 1) {
+                    data.description = '약한 비';
+                    data.icon = '🌦️';
+                } else if (data.rain < 3) {
+                    data.description = '비';
+                    data.icon = '🌧️';
+                } else {
+                    data.description = '강한 비';
+                    data.icon = '⛈️';
+                }
             }
         } else {
-            // 구름양 (운량) 정보가 없으면 온도와 습도로 판단
+            // 강수가 없을 때 습도로 판단
             if (data.humidity > 80) {
                 data.description = '흐림';
                 data.icon = '☁️';
@@ -180,7 +277,7 @@ function parseKMAData(textData) {
         }
 
     } catch (error) {
-        console.error('❌ 기상 데이터 파싱 오류:', error);
+        console.error('❌ 날씨 데이터 파싱 오류:', error);
     }
 
     return data;
@@ -209,6 +306,8 @@ function parseAirData(airRes) {
             const gradeDesc = ['좋음', '보통', '나쁨', '매우나쁨'];
             if (data.pm10Grade) data.pm10Description = gradeDesc[parseInt(data.pm10Grade) - 1] || '정보없음';
             if (data.pm25Grade) data.pm25Description = gradeDesc[parseInt(data.pm25Grade) - 1] || '정보없음';
+            
+            console.log('💨 미세먼지 데이터:', data);
         }
     } catch (error) {
         console.error('❌ 미세먼지 데이터 파싱 오류:', error);
@@ -218,36 +317,46 @@ function parseAirData(airRes) {
 }
 
 // 기상특보 조회
-async function getWeatherAlerts() {
+async function getWeatherAlerts(apiKey, lat, lon) {
     try {
-        const apiKey = 'Ubxg+7JUSNS8YPuyVLjUNQ';
-        const url = `http://apis.data.go.kr/1360000/WthrWrnInfoService/getWthrWrnList?serviceKey=${encodeURIComponent(apiKey)}&numOfRows=10&pageNo=1&dataType=JSON`;
+        const url = `https://apihub.kma.go.kr/api/typ01/url/wth_wrn.php?authKey=${apiKey}`;
         
         const response = await fetch(url);
-        const data = await response.json();
+        const textData = await response.text();
         
         const alerts = [];
         
-        if (data?.response?.body?.items?.item) {
-            const items = Array.isArray(data.response.body.items.item) 
-                ? data.response.body.items.item 
-                : [data.response.body.items.item];
+        if (!textData) return alerts;
+        
+        // 기상특보 데이터 파싱 (고정폭 텍스트 형식)
+        const lines = textData.trim().split('\n');
+        
+        if (lines.length < 2) return alerts;
+        
+        // 헤더 스킵하고 데이터 파싱
+        for (let i = 1; i < lines.length; i++) {
+            const line = lines[i].trim();
+            if (!line) continue;
             
-            items.forEach(item => {
-                // 김포/경기 지역만 필터링
-                if (item.areaName && (item.areaName.includes('김포') || item.areaName.includes('경기'))) {
-                    alerts.push({
-                        type: item.warnVar,
-                        level: item.warnStress,
-                        area: item.areaName,
-                        issue: item.tmFc,
-                        description: getAlertDescription(item.warnVar)
-                    });
-                }
-            });
+            const values = line.split(/\s+/);
+            if (values.length < 3) continue;
+            
+            // 지역명에 '김포' 또는 '서울' 포함 여부 확인
+            const areaName = values.slice(1, -1).join(' '); // 중간 부분이 지역명
+            
+            if (areaName.includes('김포') || areaName.includes('서울')) {
+                alerts.push({
+                    area: areaName,
+                    type: values[0], // 첫 번째 컬럼이 특보 종류
+                    level: values[values.length - 1], // 마지막 컬럼이 특보 단계
+                    description: getAlertDescription(values[0])
+                });
+            }
         }
         
+        console.log(`⚠️ 기상특보: ${alerts.length}건`);
         return alerts;
+        
     } catch (error) {
         console.error('❌ 기상특보 조회 오류:', error);
         return [];
@@ -276,16 +385,16 @@ function getFallbackWeather() {
     const hour = new Date().getHours();
     return {
         weather: {
-            temp: 15 + Math.random() * 10,
-            humidity: 50 + Math.random() * 30,
+            temp: 15,
+            humidity: 60,
             rain: 0,
-            windSpeed: 2 + Math.random() * 3,
-            pressure: 1013,
+            rainType: '없음',
+            windSpeed: 2.5,
             description: hour >= 6 && hour < 18 ? '맑음' : '흐림',
             icon: hour >= 6 && hour < 18 ? '☀️' : '☁️'
         },
         air: {
-            pm10: '25',
+            pm10: '30',
             pm25: '15',
             pm10Description: '좋음',
             pm25Description: '좋음'
