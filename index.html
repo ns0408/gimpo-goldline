@@ -637,10 +637,10 @@ function formatTime(date) {
 // ============================================
 // Netlify Functions를 통한 기상청 날씨 API 호출 (메인)
 // ============================================
-async function fetchWeatherFromNetlify(lat, lon) {
+async function fetchWeatherFromCloudflare(lat, lon) {
     try {
         // Netlify Functions 엔드포인트 (배포 후 자동으로 작동)
-        const url = `/.netlify/functions/weather?lat=${lat}&lon=${lon}`;
+        const url = `/weather?lat=${lat}&lon=${lon}`;
         
         console.log('🌤️ Netlify 날씨 API 호출:', lat, lon);
         
@@ -713,7 +713,7 @@ async function fetchWeatherForSelectedTime(hour, minute, selectedDay, station) {
         console.log('📅 선택 시간 날씨 조회:', '요일:', selectedDay, '시간:', hour, '분:', minute, '역:', station);
         
         // Netlify Functions를 통해 날씨 가져오기
-        let weather = await fetchWeatherFromNetlify(stationLocation.lat, stationLocation.lon);
+        let weather = await fetchWeatherFromCloudflare(stationLocation.lat, stationLocation.lon);
         
         selectedTimeWeatherData = weather;
         
@@ -851,10 +851,10 @@ async function fetchWeather() {
         console.log('🌤️ 날씨 데이터 로딩 시작...');
         
         // 김포 날씨 데이터 가져오기
-        const gimpoWeather = await fetchWeatherFromNetlify(LOCATIONS.kimpo.lat, LOCATIONS.kimpo.lon);
+        const gimpoWeather = await fetchWeatherFromCloudflare(LOCATIONS.kimpo.lat, LOCATIONS.kimpo.lon);
         
         // 서울 강서구 날씨 데이터 가져오기
-        const seoulWeather = await fetchWeatherFromNetlify(LOCATIONS.seoul.lat, LOCATIONS.seoul.lon);
+        const seoulWeather = await fetchWeatherFromCloudflare(LOCATIONS.seoul.lat, LOCATIONS.seoul.lon);
         
         if (!gimpoWeather || !seoulWeather) {
             document.getElementById('kimpoDesc').textContent = '로드 실패';
