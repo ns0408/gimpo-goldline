@@ -1,5 +1,9 @@
 const fetch = require('node-fetch');
 
+// 캐시 저장소 (30분간 유지)
+const cache = new Map();
+const CACHE_DURATION = 30 * 60 * 1000; // 30분
+
 exports.handler = async (event, context) => {
     // CORS 헤더 설정
     const headers = {
@@ -21,6 +25,23 @@ exports.handler = async (event, context) => {
             throw new Error('위도(lat)와 경도(lon) 파라미터가 필요합니다.');
         }
 
+        // 캐시 키 생성 (소수점 2자리까지만)
+        const cacheKey = `${parseFloat(lat).toFixed(2)},${parseFloat(lon).toFixed(2)}`;
+        
+        // 캐시 확인
+        const cached = cache.get(cacheKey);
+        if (cached && (Date.now() - cached.timestamp < CACHE_DURATION)) {
+            console.log('✅ 캐시에서 데이터 반환');
+            return {
+                statusCode: 200,
+                headers,
+                body: JSON.stringify({
+                    ...cached.data,
+                    cached: true
+                })
+            };
+        }
+
         // 기상청 API 키
         const kmaApiKey = 'fcIlOLe6RqCCJTi3ulag_A';
         
@@ -34,50 +55,52 @@ exports.handler = async (event, context) => {
         const day = String(kstNow.getDate()).padStart(2, '0');
         const hour = String(kstNow.getHours()).padStart(2, '0');
         
-        // 여러 시간대 시도 (최근 3시간)
+        // 최근 2시간만 시도 (속도 개선)
         const times = [];
-        for (let i = 0; i < 3; i++) {
+        for (let i = 0; i < 2; i++) {
             let h = parseInt(hour) - i;
             if (h < 0) h += 24;
             times.push(`${year}${month}${day}${String(h).padStart(2, '0')}00`);
         }
         
-        // 김포 지역 관측소
-        const stations = ['201', '108', '400']; // 김포, 서울, 인천
+        // 김포 지역 관측소 (가까운 순서)
+        const stations = ['201', '108']; // 김포, 서울
         
         console.log(`🌍 위치: (${lat}, ${lon})`);
-        console.log(`⏰ 시도할 시간: ${times.join(', ')}`);
-        console.log(`📍 시도할 관측소: ${stations.join(', ')}`);
 
         let weatherData = null;
         
-        // 여러 시간대 + 여러 관측소 조합으로 시도
+        // 병렬로 모든 조합 시도 (속도 개선!)
+        const promises = [];
         for (const stn of stations) {
             for (const tm of times) {
                 const weatherUrl = `https://apihub.kma.go.kr/api/typ01/url/kma_sfctm2.php?tm=${tm}&stn=${stn}&help=0&authKey=${kmaApiKey}`;
                 
-                try {
-                    console.log(`🔄 시도: 관측소=${stn}, 시간=${tm}`);
-                    const response = await fetch(weatherUrl, { timeout: 5000 });
-                    const textData = await response.text();
-                    
-                    if (textData && textData.length > 100) {
-                        console.log(`✅ 데이터 수신: ${textData.substring(0, 100)}...`);
-                        weatherData = parseWeatherData(textData);
-                        
-                        if (weatherData.temp !== null) {
-                            console.log(`🎉 성공! 온도: ${weatherData.temp}°C`);
-                            weatherData.station = stn;
-                            weatherData.dataTime = tm;
-                            break;
-                        }
-                    }
-                } catch (err) {
-                    console.log(`❌ 실패: ${err.message}`);
-                    continue;
-                }
+                promises.push(
+                    fetch(weatherUrl, { timeout: 2000 }) // 2초로 단축
+                        .then(response => response.text())
+                        .then(textData => {
+                            if (textData && textData.length > 100) {
+                                const parsed = parseWeatherData(textData);
+                                if (parsed.temp !== null) {
+                                    parsed.station = stn;
+                                    parsed.dataTime = tm;
+                                    return parsed;
+                                }
+                            }
+                            return null;
+                        })
+                        .catch(() => null)
+                );
             }
-            if (weatherData && weatherData.temp !== null) break;
+        }
+
+        // 첫 번째 성공한 결과 사용
+        const results = await Promise.all(promises);
+        weatherData = results.find(result => result !== null);
+
+        if (weatherData) {
+            console.log(`🎉 성공! 온도: ${weatherData.temp}°C`);
         }
 
         // 데이터 못 받았으면 기본값
@@ -86,27 +109,35 @@ exports.handler = async (event, context) => {
             weatherData = getDefaultWeather();
         }
 
+        const responseData = {
+            success: true,
+            location: {
+                lat: parseFloat(lat),
+                lon: parseFloat(lon),
+                station: weatherData.station || 'unknown'
+            },
+            weather: {
+                temp: weatherData.temp,
+                humidity: weatherData.humidity,
+                rain: weatherData.rain,
+                windSpeed: weatherData.windSpeed,
+                pressure: weatherData.pressure,
+                description: weatherData.description,
+                icon: weatherData.icon
+            },
+            timestamp: kstNow.toISOString()
+        };
+
+        // 캐시 저장
+        cache.set(cacheKey, {
+            data: responseData,
+            timestamp: Date.now()
+        });
+
         return {
             statusCode: 200,
             headers,
-            body: JSON.stringify({
-                success: true,
-                location: {
-                    lat: parseFloat(lat),
-                    lon: parseFloat(lon),
-                    station: weatherData.station || 'unknown'
-                },
-                weather: {
-                    temp: weatherData.temp,
-                    humidity: weatherData.humidity,
-                    rain: weatherData.rain,
-                    windSpeed: weatherData.windSpeed,
-                    pressure: weatherData.pressure,
-                    description: weatherData.description,
-                    icon: weatherData.icon
-                },
-                timestamp: kstNow.toISOString()
-            })
+            body: JSON.stringify(responseData)
         };
 
     } catch (error) {
