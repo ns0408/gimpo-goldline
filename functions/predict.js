@@ -1,16 +1,11 @@
 // ============================================================================
-// 김포 골드라인 혼잡도 예측 API (V3.4 - Smart Holiday Detection)
+// 김포 골드라인 혼잡도 예측 API (V3.5 - Security Unlocked)
 // ============================================================================
 
-const ALLOWED_ORIGINS = [
-    'https://gimpo-goldline.pages.dev',
-    'http://localhost:8788',
-    'http://127.0.0.1:8788'
-];
-
+// CORS 헤더 설정 (모든 도메인 허용)
 function corsHeaders(origin) {
     return {
-        'Access-Control-Allow-Origin': ALLOWED_ORIGINS.includes(origin) ? origin : 'null',
+        'Access-Control-Allow-Origin': origin || '*',
         'Access-Control-Allow-Methods': 'GET, OPTIONS',
         'Access-Control-Allow-Headers': 'Content-Type',
         'Content-Type': 'application/json; charset=utf-8'
@@ -22,67 +17,75 @@ export async function onRequestGet(context) {
     const url = new URL(request.url);
     const origin = request.headers.get('Origin') || '';
 
+    // 1. CORS Preflight 요청 처리
     if (request.method === 'OPTIONS') {
         return new Response(null, { headers: corsHeaders(origin) });
     }
-    if (!ALLOWED_ORIGINS.includes(origin) && !url.hostname.includes('localhost') && !url.hostname.includes('127.0.0.1')) {
-        return new Response(JSON.stringify({ error: 'Unauthorized Domain' }), { status: 403, headers: corsHeaders(origin) });
-    }
 
     try {
-        // 1. data.json 로드
-        const dataUrl = `${url.origin}/data.json`;
-        const dataResponse = await fetch(dataUrl);
-        if (!dataResponse.ok) throw new Error('Failed to load data.json');
-        const DATA = await dataResponse.json();
+        // 2. data.json 로드
+        // (주의: Cloudflare 내부에서 자신의 주소를 호출할 때 문제가 생길 수 있으므로,
+        //  실패 시 빈 데이터를 반환하도록 예외 처리를 강화합니다.)
+        let DATA;
+        try {
+            const dataUrl = `${url.origin}/data.json`;
+            const dataResponse = await fetch(dataUrl);
+            if (!dataResponse.ok) throw new Error('Failed to load data.json');
+            DATA = await dataResponse.json();
+        } catch (e) {
+            // data.json 로드 실패 시 에러 반환
+            return new Response(JSON.stringify({ 
+                success: false, 
+                message: 'System Error: Data file not found.', 
+                debug: e.message 
+            }), { status: 500, headers: corsHeaders(origin) });
+        }
 
-        // 2. 파라미터 파싱
+        // 3. 파라미터 파싱
         const station = url.searchParams.get('station');
         const direction = url.searchParams.get('direction') || '김포공항방면';
-        let day = url.searchParams.get('day'); // 클라이언트가 요청한 요일 (예: '월')
+        let day = url.searchParams.get('day');
         
-        // 3. 현재 시간 (한국 시간 KST) 계산
+        // 현재 시간 (한국 시간 KST)
         const now = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Seoul" }));
         const hour = url.searchParams.get('hour') || String(now.getHours()).padStart(2, '0');
         const minute = parseInt(url.searchParams.get('minute') || String(now.getMinutes()));
         
-        // ====================================================================
-        // ⚠️ [V3.4 핵심] 공휴일 자동 감지 로직
-        // ====================================================================
-        // 오늘 날짜를 YYYY-MM-DD 형식으로 변환
+        // 4. 공휴일 자동 감지 로직
         const year = now.getFullYear();
         const month = String(now.getMonth() + 1).padStart(2, '0');
         const date = String(now.getDate()).padStart(2, '0');
         const todayStr = `${year}-${month}-${date}`;
 
-        // data.json의 메타데이터에 있는 공휴일 목록 확인
         if (DATA.metadata && DATA.metadata.holidays) {
             if (DATA.metadata.holidays.includes(todayStr)) {
-                // 오늘이 공휴일 목록에 있다면, 사용자의 선택과 상관없이 '공휴일' 모델 적용
-                // (단, 사용자가 명시적으로 다른 날짜를 찍어서 조회하는 기능이 있다면 이 로직은 조정 필요.
-                //  현재는 '오늘' 위주의 앱이므로 자동 적용이 합리적임)
-                
-                // 만약 클라이언트가 요청한 요일이 '오늘의 요일'과 같다면 (즉, 오늘을 조회 중이라면)
-                // day 변수를 '공휴일'로 덮어씀
                 const week = ['일', '월', '화', '수', '목', '금', '토'];
                 const todayDayOfWeek = week[now.getDay()];
-                
                 if (day === todayDayOfWeek) {
                      day = '공휴일';
                 }
             }
         }
-        // ====================================================================
 
-        // 4. 유효성 검사
+        // 5. 유효성 검사
         if (!station || !DATA.timetable[station]) {
             return new Response(JSON.stringify({ success: false, message: 'Invalid station' }), { status: 400, headers: corsHeaders(origin) });
         }
-        if (!DATA.usage[station] || !DATA.usage[station][day]) {
+        
+        // 해당 요일 데이터가 없으면 토요일/일요일 데이터로 대체 시도 (안전장치)
+        if (!DATA.usage[station][day]) {
+             if (['토', '일', '공휴일'].includes(day)) {
+                 // 데이터가 없는데 주말이라면, 혹시 '토'나 '일' 중 있는 것으로 대체
+                 if (DATA.usage[station]['토']) day = '토';
+                 else if (DATA.usage[station]['일']) day = '일';
+             }
+        }
+
+        if (!DATA.usage[station][day]) {
             return new Response(JSON.stringify({ success: false, message: 'Data not found for this day' }), { status: 400, headers: corsHeaders(origin) });
         }
 
-        // 5. 혼잡도 계산
+        // 6. 혼잡도 계산
         const trains = findNext(station, direction, day, hour, minute, DATA);
         
         if (!trains || trains.length === 0) {
@@ -112,7 +115,6 @@ function findNext(station, direction, day, currentHour, currentMinute, DATA) {
     const timetable = DATA.timetable[station][direction];
     if (!timetable) return [];
     
-    // 공휴일은 '토일' 시간표를 사용한다고 가정
     let timeKey = '평일';
     if (['토', '일', '공휴일'].includes(day)) timeKey = '토일';
     
