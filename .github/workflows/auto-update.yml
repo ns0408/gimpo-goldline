@@ -1,0 +1,63 @@
+name: 📊 김포 골드라인 데이터 자동 갱신 (V3.3 - 8 Models)
+
+on:
+  schedule:
+    # 매일 한국시간 오전 4시 (UTC 19:00)에 실행
+    # (돌발 상황으로 어제 실패했어도, 오늘 다시 전체를 읽어 복구합니다)
+    - cron: '0 19 * * *'
+  workflow_dispatch:
+    # 깃헙 Action 탭에서 '수동 실행' 허용
+
+jobs:
+  update-data:
+    runs-on: ubuntu-latest
+    
+    steps:
+      # 1. 레포지토리 코드 가져오기
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # 2. 파이썬 환경 설정
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      # 3. ⚠️ [수정] 파이썬 라이브러리 설치 (holidays 추가)
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          # 데이터 처리(pandas), 머신러닝(sklearn), 공휴일(holidays) 설치
+          pip install pandas scikit-learn holidays
+          # (크롤링 시) pip install requests beautifulsoup4
+
+      # 4. [TODO] data.go.kr 크롤링 및 파일 다운로드
+      - name: ⬇️ Download latest data file
+        run: |
+          # [TODO] 
+          # data.go.kr 크롤링 로직 구현 필요
+          # 구현 전까지는 'raw_data/' 폴더에 수동으로 CSV를 넣어주어야 함
+          echo "Skipping download, using existing files in 'raw_data/'..."
+          # (예시) curl "API_URL" -o "raw_data/new_data_$(date +%Y%m%d).csv"
+          
+      # 5. 데이터 파싱 및 8모델 ML 예측 스크립트 실행
+      - name: ⚙️ Run ML prediction script (V3.3)
+        run: |
+          # 1단계에서 생성한 data/timetable.json 과
+          # 1단계에서 30개 CSV를 넣은 raw_data/ 폴더가 있다고 가정
+          python scripts/data_collector.py
+          
+      # 6. 갱신된 data.json 파일을 Git에 커밋 및 푸시
+      - name: 💾 Commit and push updated data.json
+        run: |
+          git config --global user.name 'github-actions[bot]'
+          git config --global user.email 'github-actions[bot]@users.noreply.github.com'
+          
+          if [[ -n $(git status --porcelain data.json) ]]; then
+            echo "Data changed. Committing..."
+            git add data.json
+            git commit -m "📊 [AutoML V3.3] 김포 골드라인 8모델 예측 갱신"
+            git push
+          else
+            echo "No data changes detected."
+          fi

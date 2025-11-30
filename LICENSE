@@ -1,0 +1,75 @@
+COPYRIGHT AND LICENSE
+
+Copyright (c) 2024 REAL KEEPER. All Rights Reserved.
+
+================================================================================
+IMPORTANT NOTICE
+================================================================================
+
+This software and all associated files, including but not limited to:
+- Source code
+- Data files (timetable data, usage statistics)
+- Algorithms and business logic
+- Documentation
+- Design elements
+
+are the proprietary property of REAL KEEPER and are protected by copyright law.
+
+================================================================================
+RESTRICTIONS
+================================================================================
+
+WITHOUT PRIOR WRITTEN PERMISSION FROM THE COPYRIGHT HOLDER, THE FOLLOWING 
+ACTIONS ARE STRICTLY PROHIBITED:
+
+1. COMMERCIAL USE: Using this software or any part of it for commercial 
+   purposes or financial gain.
+
+2. REDISTRIBUTION: Copying, distributing, or sharing this software or any 
+   part of it in any form (source code, compiled, modified, or unmodified).
+
+3. MODIFICATION: Creating derivative works, modifications, or adaptations 
+   of this software or its components.
+
+4. REVERSE ENGINEERING: Attempting to derive the source code, algorithms, 
+   or data structures from the compiled or obfuscated versions.
+
+5. DATA EXTRACTION: Extracting, copying, or using the timetable data, 
+   usage statistics, or calculation algorithms for any purpose.
+
+6. REPLICATION: Creating similar or competing services using the concepts, 
+   methods, or data contained in this software.
+
+================================================================================
+DISCLAIMER
+================================================================================
+
+THIS SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+================================================================================
+CONTACT
+================================================================================
+
+For licensing inquiries or permission requests, please contact:
+REAL KEEPER
+
+================================================================================
+ENFORCEMENT
+================================================================================
+
+Violations of this license will be prosecuted to the fullest extent of the law.
+The copyright holder reserves the right to pursue legal action including but
+not limited to:
+- Cease and desist orders
+- Monetary damages
+- Criminal prosecution
+
+================================================================================
+
+Last Updated: November 13, 2024
