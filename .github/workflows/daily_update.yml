@@ -1,0 +1,44 @@
+name: Daily Model Update
+
+on:
+  schedule:
+    # KST 04:00 = UTC 19:00 (Previous Day)
+    - cron: '0 19 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  update-data:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@v4
+
+    - name: Setup Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.10'
+        
+    - name: Install Dependencies
+      run: |
+        pip install -r requirements.txt
+
+    - name: Run Model Generator
+      run: |
+        python model_generator.py
+      
+    - name: Commit and Push if changed
+      run: |
+        git config --global user.name "github-actions[bot]"
+        git config --global user.email "github-actions[bot]@users.noreply.github.com"
+        git add assets/model_constants.js
+        # Only commit if there are changes
+        if git diff --staged --quiet; then
+          echo "No changes to commit."
+        else
+          git commit -m "Auto-update model data [Skip CI]"
+          git push
+        fi

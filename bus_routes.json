@@ -1,0 +1,43 @@
+{
+    "풍무": {
+        "stationName": "풍무역",
+        "busStopName": "풍무역.트레이더스",
+        "stationId": "233001456",
+        "targetRoutes": [
+            {
+                "id": "233000031",
+                "name": "70",
+                "dest": "당산역"
+            },
+            {
+                "id": "233000032",
+                "name": "70A",
+                "dest": "당산역"
+            }
+        ]
+    },
+    "고촌": {
+        "stationName": "고촌역",
+        "busStopName": "고촌역",
+        "stationId": "233000138",
+        "targetRoutes": [
+            {
+                "id": "233000031",
+                "name": "70",
+                "dest": "당산역"
+            }
+        ]
+    },
+    "사우": {
+        "stationName": "사우역",
+        "busStopName": "사우역.김포고",
+        "stationId": "233000141",
+        "targetRoutes": [
+            {
+                "id": "233000031",
+                "name": "70",
+                "dest": "당산역"
+            }
+        ]
+    }
+}

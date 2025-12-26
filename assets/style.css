@@ -1,0 +1,920 @@
+/* --- Style Block 1 --- */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Malgun Gothic', Arial, sans-serif;
+    background: #0D1B2A;
+    color: #F0F4F8;
+    min-height: 100vh;
+    padding: 15px;
+}
+
+.container {
+    max-width: 480px;
+    margin: 0 auto;
+}
+
+.premium-header {
+    background: linear-gradient(135deg, #1B2838 0%, #0f1c29 100%);
+    border: 2px solid #7DF9FF;
+    border-radius: 20px;
+    padding: 20px;
+    margin-bottom: 25px;
+    box-shadow: 0 0 20px rgba(125, 249, 255, 0.15);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    /* Space between Logo and Text */
+    gap: 20px;
+    position: relative;
+    overflow: hidden;
+}
+
+.header-logo {
+    width: 120px;
+    /* 200% of original 60px */
+    height: 120px;
+    border-radius: 15px;
+    border: 2px solid #7DF9FF;
+    box-shadow: 0 0 15px rgba(125, 249, 255, 0.3);
+    object-fit: contain;
+    /* Keep aspect ratio of new logo */
+    flex-shrink: 0;
+    background: #0D1B2A;
+    /* Dark background for transparent logo */
+}
+
+.header-content {
+    flex: 1;
+    text-align: right;
+    /* Align text to the right as requested */
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: flex-end;
+}
+
+.header-title {
+    font-size: 32px;
+    /* Bigger font */
+    font-weight: 900;
+    color: #7DF9FF;
+    line-height: 1.2;
+    margin-bottom: 10px;
+    text-shadow: 0 0 15px rgba(125, 249, 255, 0.4);
+}
+
+.header-subtitle {
+    font-size: 14px;
+    color: #7DF9FF;
+    /* Same color as requested */
+    font-weight: 700;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    opacity: 0.9;
+}
+
+.form-section {
+    background: #1B2838;
+    border: 2px solid #7DF9FF;
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 15px;
+    box-shadow: 0 4px 15px rgba(125, 249, 255, 0.2);
+}
+
+.form-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 8px;
+    margin-bottom: 12px;
+}
+
+.form-group {
+    margin-bottom: 12px;
+}
+
+label {
+    display: block;
+    margin-bottom: 6px;
+    font-size: 11px;
+    font-weight: 700;
+    color: #7DF9FF;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+select {
+    width: 100%;
+    padding: 10px;
+    background: #0D1B2A;
+    border: 2px solid #7DF9FF;
+    border-radius: 8px;
+    color: #F0F4F8;
+    font-size: 14px;
+    font-weight: 600;
+    transition: all 0.3s;
+    cursor: pointer;
+}
+
+select:focus {
+    outline: none;
+    border-color: #7DF9FF;
+    box-shadow: 0 0 0 3px rgba(125, 249, 255, 0.3);
+}
+
+.btn {
+    width: 100%;
+    padding: 14px;
+    background: linear-gradient(135deg, #7DF9FF 0%, #00D9FF 100%);
+    color: #0D1B2A;
+    border: none;
+    border-radius: 10px;
+    font-size: 16px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.3s;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    box-shadow: 0 4px 15px rgba(125, 249, 255, 0.4);
+}
+
+.btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(125, 249, 255, 0.6);
+}
+
+.btn:active {
+    transform: translateY(0);
+}
+
+#result {
+    margin-top: 20px;
+    opacity: 0;
+    transform: translateY(20px);
+    transition: all 0.5s;
+}
+
+#result.show {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.train-card {
+    background: #1B2838;
+    border: 2px solid #7DF9FF;
+    border-radius: 12px;
+    padding: 18px;
+    margin-bottom: 15px;
+    box-shadow: 0 4px 15px rgba(125, 249, 255, 0.2);
+}
+
+.train-card.current {
+    border-color: #FFD700;
+    box-shadow: 0 4px 20px rgba(255, 215, 0, 0.4);
+}
+
+.train-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 15px;
+    flex-wrap: wrap;
+    gap: 5px;
+}
+
+.train-label {
+    font-size: 13px;
+    font-weight: 700;
+    padding: 6px 12px;
+    background: #7DF9FF;
+    color: #0D1B2A;
+    border-radius: 20px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.train-label.current {
+    background: #FFD700;
+}
+
+.train-time {
+    font-size: 28px;
+    font-weight: 900;
+    color: #7DF9FF;
+    text-shadow: 0 0 10px rgba(125, 249, 255, 0.5);
+}
+
+.train-time.origin {
+    color: #FFD700;
+    text-shadow: 0 0 10px rgba(255, 215, 0, 0.5);
+}
+
+.honey-tip {
+    background: linear-gradient(135deg, rgba(255, 215, 0, 0.15) 0%, rgba(255, 193, 7, 0.1) 100%);
+    border: 2px solid #FFD700;
+    border-radius: 10px;
+    padding: 12px;
+    margin-bottom: 15px;
+}
+
+.honey-tip-title {
+    font-size: 14px;
+    font-weight: 700;
+    color: #FFD700;
+    margin-bottom: 6px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.honey-tip-text {
+    font-size: 12px;
+    color: #F0F4F8;
+    line-height: 1.5;
+}
+
+.congestion-main {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    padding: 15px;
+    background: rgba(125, 249, 255, 0.05);
+    border-radius: 10px;
+    margin-bottom: 15px;
+}
+
+.congestion-icon-big {
+    font-size: 64px;
+}
+
+.congestion-info {
+    flex: 1;
+}
+
+.congestion-level-big {
+    font-size: 36px;
+    font-weight: 900;
+    color: #7DF9FF;
+}
+
+.congestion-name {
+    font-size: 16px;
+    font-weight: 700;
+    color: #F0F4F8;
+    margin: 4px 0;
+}
+
+.congestion-desc {
+    font-size: 12px;
+    color: #B0BEC5;
+    line-height: 1.4;
+}
+
+.route-congestion {
+    background: rgba(125, 249, 255, 0.05);
+    border-radius: 10px;
+    padding: 15px;
+    margin-bottom: 15px;
+}
+
+.route-title {
+    font-size: 13px;
+    font-weight: 700;
+    color: #7DF9FF;
+    margin-bottom: 10px;
+}
+
+.route-line {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.route-station {
+    font-size: 11px;
+    font-weight: 600;
+    padding: 6px 10px;
+    border-radius: 6px;
+    white-space: nowrap;
+}
+
+.route-arrow {
+    color: #7DF9FF;
+    font-size: 12px;
+}
+
+.level-1 {
+    background: #4CAF50;
+    color: #FFF;
+}
+
+.level-2 {
+    background: #8BC34A;
+    color: #FFF;
+}
+
+.level-3 {
+    background: #FFEB3B;
+    color: #333;
+}
+
+.level-4 {
+    background: #FFC107;
+    color: #333;
+}
+
+.level-5 {
+    background: #FF9800;
+    color: #FFF;
+}
+
+.level-6 {
+    background: #FF5722;
+    color: #FFF;
+}
+
+.level-7 {
+    background: #F44336;
+    color: #FFF;
+}
+
+.level-8 {
+    background: #E91E63;
+    color: #FFF;
+}
+
+.level-9 {
+    background: #9C27B0;
+    color: #FFF;
+}
+
+.level-10 {
+    background: #000;
+    color: #FFF;
+}
+
+.timetable-compact {
+    background: rgba(125, 249, 255, 0.05);
+    border-radius: 10px;
+    padding: 15px;
+    margin-bottom: 15px;
+}
+
+.timetable-title {
+    font-size: 13px;
+    font-weight: 700;
+    color: #7DF9FF;
+    margin-bottom: 10px;
+}
+
+.time-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.time-chip {
+    font-size: 12px;
+    font-weight: 600;
+    padding: 6px 10px;
+    background: #0D1B2A;
+    color: #F0F4F8;
+    border: 1px solid #7DF9FF;
+    border-radius: 6px;
+}
+
+.time-chip.origin {
+    background: #FFD700;
+    color: #0D1B2A;
+    border-color: #FFD700;
+    font-weight: 700;
+}
+
+.detail-section {
+    background: rgba(125, 249, 255, 0.05);
+    border-radius: 10px;
+    padding: 15px;
+}
+
+.detail-title {
+    font-size: 13px;
+    font-weight: 700;
+    color: #7DF9FF;
+    margin-bottom: 10px;
+}
+
+.detail-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 8px 0;
+    border-bottom: 1px solid rgba(125, 249, 255, 0.1);
+}
+
+.detail-row:last-child {
+    border-bottom: none;
+}
+
+.detail-label {
+    font-size: 12px;
+    color: #B0BEC5;
+}
+
+.detail-value {
+    font-size: 12px;
+    font-weight: 700;
+    color: #F0F4F8;
+}
+
+.footer {
+    text-align: center;
+    margin-top: 30px;
+    padding: 20px;
+    background: #1B2838;
+    border: 2px solid #7DF9FF;
+    border-radius: 12px;
+}
+
+.footer-title {
+    font-size: 14px;
+    font-weight: 700;
+    color: #7DF9FF;
+    margin-bottom: 10px;
+}
+
+.footer-text {
+    font-size: 11px;
+    color: #B0BEC5;
+    line-height: 1.6;
+    margin-bottom: 8px;
+}
+
+.footer-copyright {
+    font-size: 10px;
+    color: #7DF9FF;
+    margin-top: 15px;
+    padding-top: 15px;
+    border-top: 1px solid rgba(125, 249, 255, 0.2);
+}
+
+/* ========================================
+         새로운 여정 프로필 UI를 위한 CSS
+        ========================================
+        */
+.journey-profile {
+    background: #1B2838;
+    border: 2px solid #7DF9FF;
+    border-radius: 12px;
+    padding: 18px;
+    margin-bottom: 15px;
+    box-shadow: 0 4px 15px rgba(125, 249, 255, 0.2);
+}
+
+.journey-header {
+    font-size: 18px;
+    font-weight: 700;
+    color: #F0F4F8;
+    margin-bottom: 20px;
+    padding-bottom: 15px;
+    border-bottom: 1px solid rgba(125, 249, 255, 0.2);
+}
+
+.journey-header span {
+    color: #7DF9FF;
+}
+
+/* 1. 시각적 노선도 */
+.journey-map-wrapper {
+    overflow-x: auto;
+    /* 가로 스크롤 */
+    padding-bottom: 15px;
+    margin-bottom: 15px;
+}
+
+.journey-map {
+    display: flex;
+    align-items: center;
+    min-width: 600px;
+    /* 스크롤이 생기도록 최소 너비 지정 */
+}
+
+.map-station {
+    flex-shrink: 0;
+    padding: 8px 12px;
+    background: #0D1B2A;
+    border: 1px solid #7DF9FF;
+    border-radius: 8px;
+    font-weight: 700;
+    font-size: 13px;
+    white-space: nowrap;
+}
+
+.map-station.current {
+    /* 탑승역 스타일 */
+    background: #FFD700;
+    color: #0D1B2A;
+    border-color: #FFD700;
+}
+
+.map-segment {
+    flex-shrink: 0;
+    flex-grow: 1;
+    padding: 5px 10px;
+    margin: 0 4px;
+    border-radius: 20px;
+    text-align: center;
+    border: 1px dashed rgba(255, 255, 255, 0.2);
+}
+
+.map-icon {
+    font-size: 20px;
+    display: block;
+    line-height: 1;
+}
+
+.map-text {
+    font-size: 11px;
+    font-weight: 600;
+    color: #0D1B2A;
+    /* 아이콘 배경색과 대비되는 어두운 색 */
+}
+
+/* 혼잡도 수준별 배경색 (기존 CSS 재활용) */
+.map-segment.level-1 .map-text,
+.map-segment.level-2 .map-text {
+    color: #FFF;
+}
+
+.map-segment.level-3 .map-text,
+.map-segment.level-4 .map-text {
+    color: #333;
+}
+
+.map-segment.level-5 .map-text,
+.map-segment.level-6 .map-text,
+.map-segment.level-7 .map-text,
+.map-segment.level-8 .map-text,
+.map-segment.level-9 .map-text,
+.map-segment.level-10 .map-text {
+    color: #FFF;
+}
+
+/* 2. 혼잡도 범례 */
+.legend-section {
+    background: rgba(125, 249, 255, 0.05);
+    border-radius: 10px;
+    padding: 15px;
+    margin-bottom: 15px;
+}
+
+.legend-title {
+    font-size: 13px;
+    font-weight: 700;
+    color: #7DF9FF;
+    margin-bottom: 12px;
+}
+
+.legend-item {
+    display: flex;
+    align-items: center;
+    font-size: 11px;
+    color: #F0F4F8;
+    margin-bottom: 6px;
+}
+
+.legend-icon {
+    font-size: 16px;
+    width: 28px;
+    height: 28px;
+    line-height: 28px;
+    text-align: center;
+    border-radius: 5px;
+    margin-right: 10px;
+}
+
+.legend-item strong {
+    color: #FFF;
+    margin: 0 5px;
+}
+
+/* 혼잡도 수준별 아이콘 배경색 (기존 CSS 재활용) */
+.legend-icon.level-1,
+.legend-icon.level-2 {
+    color: #FFF;
+}
+
+.legend-icon.level-3,
+.legend-icon.level-4 {
+    color: #333;
+}
+
+.legend-icon.level-5,
+.legend-icon.level-6,
+.legend-icon.level-7,
+.legend-icon.level-8,
+.legend-icon.level-9,
+.legend-icon.level-10 {
+    color: #FFF;
+}
+
+
+/* 3. 상세 데이터 테이블 */
+.table-section {
+    background: rgba(125, 249, 255, 0.05);
+    border-radius: 10px;
+    padding: 15px;
+}
+
+.table-title {
+    font-size: 13px;
+    font-weight: 700;
+    color: #7DF9FF;
+    margin-bottom: 12px;
+}
+
+.detail-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.detail-table th,
+.detail-table td {
+    border: 1px solid rgba(125, 249, 255, 0.2);
+    padding: 8px;
+    text-align: center;
+    font-size: 11px;
+}
+
+.detail-table th {
+    background: rgba(125, 249, 255, 0.1);
+    color: #7DF9FF;
+    font-weight: 700;
+}
+
+.detail-table td {
+    color: #F0F4F8;
+}
+
+.detail-table td:first-child {
+    text-align: left;
+    padding-left: 10px;
+    font-weight: 600;
+}
+
+.detail-table td strong {
+    color: #FFF;
+    font-size: 12px;
+}
+
+/* 날씨 섹션 스타일 */
+.weather-section {
+    background: linear-gradient(135deg, rgba(125, 249, 255, 0.1) 0%, rgba(125, 249, 255, 0.05) 100%);
+    border: 2px solid #7DF9FF;
+    border-radius: 12px;
+    padding: 15px;
+    margin-bottom: 15px;
+}
+
+.weather-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+}
+
+.weather-card {
+    background: rgba(13, 27, 42, 0.5);
+    padding: 12px;
+    border-radius: 8px;
+}
+
+.weather-title {
+    font-size: 11px;
+    color: #7DF9FF;
+    font-weight: 700;
+    margin-bottom: 8px;
+    text-transform: uppercase;
+}
+
+.weather-main {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 8px;
+}
+
+.weather-icon {
+    font-size: 36px;
+}
+
+.weather-temp {
+    font-size: 28px;
+    font-weight: 900;
+    color: #F0F4F8;
+}
+
+.weather-desc {
+    font-size: 11px;
+    color: #B0BEC5;
+}
+
+.weather-detail {
+    font-size: 10px;
+    color: #B0BEC5;
+    margin-top: 4px;
+}
+
+
+/* 툴팁 스타일 */
+.info-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+    margin-left: 8px;
+    background: #7DF9FF;
+    color: #0D1B2A;
+    border-radius: 50%;
+    font-size: 14px;
+    font-weight: 900;
+    cursor: pointer;
+    vertical-align: middle;
+    transition: all 0.2s;
+    font-family: Arial, sans-serif;
+}
+
+.info-icon:hover {
+    background: #00D9FF;
+    transform: scale(1.15);
+    box-shadow: 0 0 10px rgba(125, 249, 255, 0.5);
+}
+
+.tooltip-popup {
+    display: none;
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: #1B2838;
+    border: 2px solid #7DF9FF;
+    border-radius: 12px;
+    padding: 20px;
+    max-width: 400px;
+    width: 90%;
+    z-index: 1000;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+}
+
+.tooltip-popup.show {
+    display: block;
+    animation: fadeIn 0.3s;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translate(-50%, -50%) scale(0.9);
+    }
+
+    to {
+        opacity: 1;
+        transform: translate(-50%, -50%) scale(1);
+    }
+}
+
+.tooltip-overlay {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.7);
+    z-index: 999;
+}
+
+.tooltip-overlay.show {
+    display: block;
+}
+
+.tooltip-header {
+    font-size: 16px;
+    font-weight: 700;
+    color: #7DF9FF;
+    margin-bottom: 12px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid rgba(125, 249, 255, 0.3);
+}
+
+.tooltip-content {
+    font-size: 13px;
+    color: #F0F4F8;
+    line-height: 1.6;
+    margin-bottom: 15px;
+}
+
+.tooltip-highlight {
+    background: rgba(255, 215, 0, 0.1);
+    border-left: 3px solid #FFD700;
+    padding: 10px;
+    margin-top: 10px;
+    font-size: 12px;
+    color: #F0F4F8;
+    border-radius: 4px;
+}
+
+.tooltip-close {
+    width: 100%;
+    padding: 10px;
+    background: #7DF9FF;
+    color: #0D1B2A;
+    border: none;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.3s;
+}
+
+.tooltip-close:hover {
+    background: #00D9FF;
+    transform: translateY(-2px);
+}
+
+/* 팝업 애니메이션 */
+@keyframes popupFadeIn {
+    from {
+        opacity: 0;
+        transform: translate(-50%, -50%) scale(0.9);
+    }
+
+    to {
+        opacity: 1;
+        transform: translate(-50%, -50%) scale(1);
+    }
+}
+
+@keyframes popupFadeOut {
+    from {
+        opacity: 1;
+        transform: translate(-50%, -50%) scale(1);
+    }
+
+    to {
+        opacity: 0;
+        transform: translate(-50%, -50%) scale(0.9);
+    }
+}
+
+@keyframes overlayFadeIn {
+    from {
+        opacity: 0;
+    }
+
+    to {
+        opacity: 1;
+    }
+}
+
+@keyframes overlayFadeOut {
+    from {
+        opacity: 1;
+    }
+
+    to {
+        opacity: 0;
+    }
+}
+
+/* ========================================
+   [New] 부동산 인사이트 섹션 스타일
+   ========================================
+*/
+.insight-container {
+    margin-top: 20px;
+    margin-bottom: 20px;
+    opacity: 0;
+    transform: translateY(10px);
+    transition: opacity 0.5s ease, transform 0.5s ease;
+}
+
+.insight-container.show {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.insight-item {
+    transition: background 0.2s;
+}
+
+.insight-item:hover {
+    background: rgba(255, 255, 255, 0.08) !important;
+}

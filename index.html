@@ -1,70 +1,27 @@
 <!DOCTYPE html>
 <html lang="ko">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>김포 골드라인 혼잡도 예측 - REAL KEEPER</title>
-    <style>
-        /* 기존 스타일 유지 */
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Malgun Gothic', Arial, sans-serif; background: #0D1B2A; color: #F0F4F8; min-height: 100vh; padding: 15px; }
-        .container { max-width: 480px; margin: 0 auto; }
-        .logo-section { display: flex; align-items: center; justify-content: space-between; gap: 15px; margin-bottom: 20px; padding: 15px 20px; background: #1B2838; border: 3px solid #7DF9FF; border-radius: 15px; box-shadow: 0 4px 20px rgba(125, 249, 255, 0.3); }
-        .logo-section img { width: 60px; height: 60px; border: 2px solid #7DF9FF; border-radius: 10px; box-shadow: 0 0 15px rgba(125, 249, 255, 0.4); }
-        .logo-text { font-size: 32px; font-weight: 900; color: #7DF9FF; letter-spacing: 2px; line-height: 1; text-align: right; flex: 1; text-shadow: 0 0 15px rgba(125, 249, 255, 0.6); }
-        .header { background: #1B2838; border: 2px solid #7DF9FF; border-radius: 15px; padding: 20px; text-align: center; margin-bottom: 20px; box-shadow: 0 4px 15px rgba(125, 249, 255, 0.2); }
-        .header h1 { font-size: 40px; margin-bottom: 8px; color: #F0F4F8; }
-        .header p { font-size: 12px; color: #7DF9FF; }
-        .form-section { background: #1B2838; border: 2px solid #7DF9FF; border-radius: 12px; padding: 20px; margin-bottom: 15px; box-shadow: 0 4px 15px rgba(125, 249, 255, 0.2); }
-        .form-row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-bottom: 12px; }
-        .form-group { margin-bottom: 12px; }
-        label { display: block; margin-bottom: 6px; font-size: 11px; font-weight: 700; color: #7DF9FF; text-transform: uppercase; letter-spacing: 0.5px; }
-        select { width: 100%; padding: 10px; background: #0D1B2A; border: 2px solid #7DF9FF; border-radius: 8px; color: #F0F4F8; font-size: 14px; font-weight: 600; transition: all 0.3s; cursor: pointer; }
-        select:focus { outline: none; border-color: #7DF9FF; box-shadow: 0 0 0 3px rgba(125, 249, 255, 0.3); }
-        .btn { width: 100%; padding: 14px; background: linear-gradient(135deg, #7DF9FF 0%, #00D9FF 100%); color: #0D1B2A; border: none; border-radius: 10px; font-size: 16px; font-weight: 700; cursor: pointer; transition: all 0.3s; text-transform: uppercase; letter-spacing: 1px; box-shadow: 0 4px 15px rgba(125, 249, 255, 0.4); }
-        .btn:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(125, 249, 255, 0.6); }
-        .btn:active { transform: translateY(0); }
-        #result { margin-top: 20px; opacity: 0; transform: translateY(20px); transition: all 0.5s; }
-        #result.show { opacity: 1; transform: translateY(0); }
-        .train-card { background: #1B2838; border: 2px solid #7DF9FF; border-radius: 12px; padding: 18px; margin-bottom: 15px; box-shadow: 0 4px 15px rgba(125, 249, 255, 0.2); }
-        .train-card.current { border-color: #FFD700; box-shadow: 0 4px 20px rgba(255, 215, 0, 0.4); }
-        .train-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; flex-wrap: wrap; gap: 5px; }
-        .train-label { font-size: 13px; font-weight: 700; padding: 6px 12px; background: #7DF9FF; color: #0D1B2A; border-radius: 20px; text-transform: uppercase; letter-spacing: 0.5px; display: flex; align-items: center; justify-content: center; }
-        .train-label.current { background: #FFD700; }
-        .train-time { font-size: 28px; font-weight: 900; color: #7DF9FF; text-shadow: 0 0 10px rgba(125, 249, 255, 0.5); }
-        .train-time.origin { color: #FFD700; text-shadow: 0 0 10px rgba(255, 215, 0, 0.5); }
-        
-        /* 노선도 스타일 */
-        .journey-route { display: flex; gap: 5px; overflow-x: auto; padding-bottom: 5px; }
-        
-        /* 기타 섹션 스타일 */
-        .footer { text-align: center; margin-top: 30px; padding: 20px; background: #1B2838; border: 2px solid #7DF9FF; border-radius: 12px; }
-        .footer-title { font-size: 14px; font-weight: 700; color: #7DF9FF; margin-bottom: 10px; }
-        .footer-text { font-size: 11px; color: #B0BEC5; line-height: 1.6; margin-bottom: 8px; }
-        .footer-copyright { font-size: 10px; color: #7DF9FF; margin-top: 15px; padding-top: 15px; border-top: 1px solid rgba(125, 249, 255, 0.2); }
-        
-        /* 날씨 */
-        .weather-section { background: linear-gradient(135deg, rgba(125, 249, 255, 0.1) 0%, rgba(125, 249, 255, 0.05) 100%); border: 2px solid #7DF9FF; border-radius: 12px; padding: 15px; margin-bottom: 15px; }
-        .weather-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-        .weather-card { background: rgba(13, 27, 42, 0.5); padding: 12px; border-radius: 8px; }
-        .weather-title { font-size: 11px; color: #7DF9FF; font-weight: 700; margin-bottom: 8px; text-transform: uppercase; }
-        .weather-main { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
-        .weather-icon { font-size: 36px; }
-        .weather-temp { font-size: 28px; font-weight: 900; color: #F0F4F8; }
-        .weather-desc { font-size: 11px; color: #B0BEC5; }
-        .weather-detail { font-size: 10px; color: #B0BEC5; margin-top: 4px; }
-    </style>
+    <title>REAL KEEPER: 김포 Insight</title>
+
+
+    <link rel="stylesheet" href="assets/style.css">
 </head>
+
 <body>
     <div class="container">
-        <div class="logo-section">
-            <div style="font-size: 40px;">🚇</div>
-            <div class="logo-text">Made by <strong>리얼키퍼</strong></div>
-        </div>
-        <div class="header">
-            <h1>🚇 김포골드라인<br>혼잡도 예측</h1>
-            <p>최신 데이터 기반 예측 서비스 (Secure)</p>
-        </div>
+        <header class="premium-header">
+            <a href="http://www.realkeeper.co.kr" target="_blank">
+                <img src="assets/real_keeper_logo.png" alt="Real Keeper Logo" class="header-logo">
+            </a>
+            <div class="header-content">
+                <h1 class="header-title">REAL KEEPER<br>김포 Insight</h1>
+                <div class="header-subtitle">김포골드라인 AI 혼잡도 예측 & 부동산 인사이트</div>
+            </div>
+        </header>
+
 
         <div class="weather-section" id="weatherSection">
             <div class="weather-grid">
@@ -93,7 +50,14 @@
             </div>
         </div>
 
+        <!-- Insight Section (Moved here) -->
+        <div id="insight-section" class="insight-container"></div>
+
         <div class="form-section">
+            <!-- [User Request] Section Title Moved Here -->
+            <div
+                style="font-size:18px; font-weight:800; color:#00E676; margin-bottom:15px; text-align:center; text-shadow:0 0 10px rgba(0,230,118,0.3);">
+                🤖 골드라인 AI 혼잡도 분석</div>
             <div class="form-row">
                 <div class="form-group">
                     <label>요일</label>
@@ -120,7 +84,7 @@
                 <label>방향</label>
                 <select id="direction" onchange="updateStations()">
                     <option value="김포공항방면">김포공항 방면</option>
-                    <option value="양촌역방면">양촌역 방면</option>
+                    <option value="양촌역방면">구래(양촌)역 방면</option>
                 </select>
             </div>
             <div class="form-group">
@@ -129,174 +93,65 @@
             </div>
             <button class="btn" onclick="analyze()">🔍 혼잡도 분석</button>
         </div>
-        <div id="result"></div>
+        <div id="result" class="result-container">
+            <!-- 결과가 여기에 동적으로 생성됩니다 -->
+        </div>
+
+        <!-- 툴팁 팝업 (체감 혼잡도 설명) -->
+        <div id="tooltipOverlay" class="tooltip-overlay" onclick="closeTooltip()"></div>
+        <div id="tooltipPopup" class="tooltip-popup">
+            <div class="tooltip-header">
+                구간별 평균혼잡도란?
+            </div>
+            <div class="tooltip-content">
+                <p>과거 운행 빅데이터를 바탕으로 분석한 해당 구간의 평균적인 붐빔 정도를 의미합니다.<br>
+                    <span style="font-size:0.9em; color:#B0BEC5;">※ 실시간 혼잡도가 아니므로 실제 상황과 다를 수 있습니다.</span>
+                </p>
+                <div class="tooltip-highlight">
+                    <strong>💡 팁:</strong> 혼잡도가 150% 이상일 경우, 다음 열차를 이용하거나 대체 교통수단을 고려해보세요.
+                </div>
+            </div>
+            <button class="tooltip-close" onclick="closeTooltip()">닫기</button>
+        </div>
+
+        <!-- 혼잡도 아이콘 클릭 시 나오는 팝업 (동적 생성됨) -->
+
+
 
         <div class="footer">
-            <div class="footer-title">📊 혼잡도 정보 안내</div>
-            <div class="footer-text">- 본 정보는 실시간 혼잡도가 아니며, 교통카드 빅데이터 기반의 통계 예측 정보입니다.</div>
-            <div class="footer-text">- <strong style="color: #7DF9FF;">🔒 Secure Mode:</strong> 모든 데이터는 암호화된 서버에서 처리됩니다.</div>
-            <div class="footer-copyright">© 2025 REAL KEEPER (Park, Namsun). All rights reserved.</div>
+            <div class="footer-title">🏆 REAL KEEPER: 김포 부동산 & 교통 인사이트</div>
+            <div class="footer-text">
+                본 서비스는 <strong>공인중개사/권리분석사 '리얼키퍼(Real Keeper)'</strong>가 제공하는<br>
+                김포골드라인 맞춤형 교통 분석 및 지역 가치 평가 플랫폼입니다.
+            </div>
+            <div class="footer-text">
+                🚦 <strong>AI 혼잡도 예측 모델</strong>을 통해 출퇴근길의 불편함을 최소화하고,<br>
+                🏘️ <strong>지역 부동산 빅데이터</strong>와 결합하여 최적의 주거 입지를 제안합니다.
+            </div>
+            <div class="footer-text"
+                style="margin-top: 15px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 10px;">
+                본 정보는 실시간 혼잡도가 아니며, 교통카드 빅데이터 기반의 통계 예측 정보입니다.<br>
+                - 본 예측은 단순 평균이 아닌, 날씨, 계절, 방학, 공휴일/명절 등의 교통 변수를 반영한 '리얼키퍼' 자체 예측 모델을 기반으로 합니다.<br>
+                - 🤖 머신러닝(Machine Learning) 알고리즘을 활용하여 과거 데이터 패턴을 학습하고 예측 정확도를 높였습니다.<br>
+                - '구간 통과 인원(Sectional Load)' 방식으로 계산되어 신뢰도를 높였습니다.<br>
+                • 계산식: (예측된 구간 통과 인원 ÷ 시간당 열차 수 ÷ 정원) × 100
+            </div>
+            <div class="footer-copyright">
+                문의: www.realkeeper.co.kr | © 2025 REAL KEEPER (Park, Namsun). All rights reserved.
+            </div>
         </div>
     </div>
 
-    <script>
-    // ============================================
-    // 전역 상수
-    // ============================================
-    const API_BASE = window.location.origin; // 현재 도메인 (Cloudflare Pages)
-    const ROUTES = {
-        '김포공항방면': ['양촌역','구래역','마산역','장기역','운양역','걸포역','사우역','풍무역','고촌역','김포공항'], 
-        '양촌역방면': ['김포공항','고촌역','풍무역','사우역','걸포역','운양역','장기역','마산역','구래역','양촌역']
-    };
 
-    // ============================================
-    // 1. 초기화 함수
-    // ============================================
-    function init() {
-        // 시간/분 옵션 생성
-        const hourSelect = document.getElementById('hour');
-        const minuteSelect = document.getElementById('minute');
-        
-        for(let i=0; i<24; i++) {
-            const opt = document.createElement('option');
-            opt.value = String(i).padStart(2,'0');
-            opt.textContent = i + '시';
-            hourSelect.appendChild(opt);
-        }
-        hourSelect.value = '08';
 
-        for(let i=0; i<60; i++) {
-            const opt = document.createElement('option');
-            opt.value = String(i);
-            opt.textContent = String(i).padStart(2,'0') + '분';
-            minuteSelect.appendChild(opt);
-        }
-        
-        // 역 목록 초기화
-        updateStations();
-        
-        // 날씨 로드 (기존 로직 유지)
-        fetchWeather();
-    }
+    <!-- 툴팁 오버레이 -->
 
-    function updateStations() {
-        const dir = document.getElementById('direction').value;
-        const st = document.getElementById('station');
-        st.innerHTML = ROUTES[dir].map(s=>`<option value="${s}">${s}</option>`).join('');
-    }
 
-    // ============================================
-    // 2. 서버 통신 (핵심 보안 기능)
-    // ============================================
-    async function predictCongestion(station, direction, day, hour, minute) {
-        try {
-            // Cloudflare Functions 호출 (/predict 엔드포인트)
-            const url = `${API_BASE}/predict?station=${encodeURIComponent(station)}&direction=${encodeURIComponent(direction)}&day=${encodeURIComponent(day)}&hour=${hour}&minute=${minute}`;
-            
-            const response = await fetch(url);
-            if (!response.ok) throw new Error(`서버 연결 실패 (${response.status})`);
-            
-            const json = await response.json();
-            if (!json.success) throw new Error(json.error || '예측 실패');
-            
-            return json.data;
-        } catch (error) {
-            console.error('API Error:', error);
-            throw error;
-        }
-    }
 
-    // ============================================
-    // 3. 분석 및 렌더링
-    // ============================================
-    async function analyze() {
-        const day = document.getElementById('dayOfWeek').value;
-        const dir = document.getElementById('direction').value;
-        const st = document.getElementById('station').value;
-        const h = parseInt(document.getElementById('hour').value);
-        const m = parseInt(document.getElementById('minute').value);
-        
-        const resultDiv = document.getElementById('result');
-        resultDiv.innerHTML = '<div class="train-card" style="text-align:center;">⏳ 데이터를 불러오는 중입니다...</div>';
-        resultDiv.classList.add('show');
-
-        try {
-            // 서버에서 데이터 가져오기
-            const apiData = await predictCongestion(st, dir, day, h, m);
-            const trains = apiData.trains;
-
-            if (!trains || trains.length === 0) {
-                resultDiv.innerHTML = '<div class="train-card">운행하는 열차가 없습니다.</div>';
-                return;
-            }
-
-            let html = '';
-            
-            // 최대 2대 표시
-            const displayTrains = trains.slice(0, 2);
-
-            // (1) 열차 시간 정보
-            html += '<div class="train-card current">';
-            html += '<div class="train-header">';
-            displayTrains.forEach((train, i) => {
-                const timeStr = `${String(train.time.hour).padStart(2,'0')}:${String(train.time.minute).padStart(2,'0')}`;
-                const label = i === 0 ? '🚇 이번 열차' : '🚇 다음 열차';
-                const labelClass = i === 0 ? 'train-label current' : 'train-label';
-                
-                html += `<div style="display:flex; justify-content:space-between; align-items:center; width:100%; margin-bottom:10px;">
-                            <span class="${labelClass}">${label}</span>
-                            <span class="train-time ${i===0?'origin':''}">${timeStr}</span>
-                         </div>`;
-            });
-            html += '</div></div>';
-
-            // (2) 혼잡도 및 노선도
-            displayTrains.forEach((train, i) => {
-                const cong = train.congestion;
-                html += `<div class="train-card">`;
-                html += `<div style="font-size:16px; font-weight:bold; color:#7DF9FF; margin-bottom:10px;">
-                            ${i===0 ? '이번 열차' : '다음 열차'} 혼잡도: ${cong.emoji} ${cong.text} (${cong.pct}%)
-                         </div>`;
-                
-                // 노선도 그리기
-                html += renderRoute(train.route);
-                html += `</div>`;
-            });
-
-            resultDiv.innerHTML = html;
-
-        } catch (error) {
-            resultDiv.innerHTML = `<div class="train-card" style="color:#ff5555;">⚠️ 오류가 발생했습니다.<br>${error.message}</div>`;
-        }
-    }
-
-    // 노선도 렌더링 헬퍼
-    function renderRoute(routeData) {
-        let html = '<div style="display:flex; overflow-x:auto; padding-bottom:10px; gap:5px;">';
-        routeData.forEach(segment => {
-            html += `<div style="min-width:70px; text-align:center; background:rgba(255,255,255,0.05); padding:5px; border-radius:8px;">
-                        <div style="font-size:20px;">${segment.emoji}</div>
-                        <div style="font-size:11px; margin-top:2px; font-weight:bold;">${segment.pct}%</div>
-                        <div style="font-size:10px; color:#B0BEC5;">${segment.station}</div>
-                     </div>`;
-        });
-        html += '</div>';
-        return html;
-    }
-
-    // ============================================
-    // 4. 날씨 (기존 로직 간소화 유지)
-    // ============================================
-    // (OpenWeatherMap 키가 있는 경우 여기에 기존 fetchWeather 함수 유지)
-    async function fetchWeather() {
-        // 기존 날씨 코드 유지... (길어서 생략, 기존 코드 그대로 두시면 됩니다)
-        // 만약 API 키가 없다면 화면에 "API 키 필요"라고 뜹니다.
-        document.getElementById('kimpoDesc').textContent = "준비완료";
-        document.getElementById('seoulDesc').textContent = "준비완료";
-    }
-
-    // 실행
-    window.addEventListener('load', init);
-    </script>
+    <script src="assets/bus_data.js"></script>
+    <script src="assets/schedule_data.js"></script>
+    <script src="assets/model_constants.js"></script> <!-- [Hybrid ML] Factor Model -->
+    <script src="assets/script.js" defer></script>
 </body>
+
 </html>

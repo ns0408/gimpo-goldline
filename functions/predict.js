@@ -1,164 +1,323 @@
 // ============================================================================
-// 김포 골드라인 혼잡도 예측 API (V3.5 - Security Unlocked)
+// 김포 골드라인 혼잡도 예측 API (V4.1 - Emergency Unlocked)
 // ============================================================================
 
-// CORS 헤더 설정 (모든 도메인 허용)
-function corsHeaders(origin) {
-    return {
-        'Access-Control-Allow-Origin': origin || '*',
-        'Access-Control-Allow-Methods': 'GET, OPTIONS',
-        'Access-Control-Allow-Headers': 'Content-Type',
-        'Content-Type': 'application/json; charset=utf-8'
-    };
-}
+// Global Cache prevents re-fetching/parsing on every request (Hot Start)
+let cachedDb = null;
 
-export async function onRequestGet(context) {
+// HARDCODED FALLBACK DRIVER (Minimal viable data pattern)
+// Used when both Local and GitHub sources fail/timeout
+const FALLBACK_DB = {
+    EMERGENCY_MODE: true,
+    // We don't populate full data here, but use a flag to trigger heuristic logic
+};
+
+export async function onRequest(context) {
     const { request } = context;
     const url = new URL(request.url);
-    const origin = request.headers.get('Origin') || '';
 
-    // 1. CORS Preflight 요청 처리
-    if (request.method === 'OPTIONS') {
-        return new Response(null, { headers: corsHeaders(origin) });
+    // 1. CORS Headers
+    const corsHeaders = {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "GET, HEAD, POST, OPTIONS",
+        "Access-Control-Allow-Headers": "Content-Type",
+    };
+
+    if (request.method === "OPTIONS") {
+        return new Response(null, { headers: corsHeaders });
     }
 
     try {
-        // 2. data.json 로드
-        // (주의: Cloudflare 내부에서 자신의 주소를 호출할 때 문제가 생길 수 있으므로,
-        //  실패 시 빈 데이터를 반환하도록 예외 처리를 강화합니다.)
-        let DATA;
-        try {
-            const dataUrl = `${url.origin}/data.json`;
-            const dataResponse = await fetch(dataUrl);
-            if (!dataResponse.ok) throw new Error('Failed to load data.json');
-            DATA = await dataResponse.json();
-        } catch (e) {
-            // data.json 로드 실패 시 에러 반환
-            return new Response(JSON.stringify({ 
-                success: false, 
-                message: 'System Error: Data file not found.', 
-                debug: e.message 
-            }), { status: 500, headers: corsHeaders(origin) });
+        const params = url.searchParams;
+
+        // 2. Validate Inputs
+        const station = params.get("station");
+        const dateVal = params.get("day");
+        const timeVal = parseInt(params.get("hour"));
+        const direction = params.get("direction");
+
+        if (!station || !dateVal || isNaN(timeVal)) {
+            return new Response(JSON.stringify({ success: false, error: "Missing parameters" }), {
+                headers: { ...corsHeaders, "Content-Type": "application/json" }
+            });
         }
 
-        // 3. 파라미터 파싱
-        const station = url.searchParams.get('station');
-        const direction = url.searchParams.get('direction') || '김포공항방면';
-        let day = url.searchParams.get('day');
-        
-        // 현재 시간 (한국 시간 KST)
-        const now = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Seoul" }));
-        const hour = url.searchParams.get('hour') || String(now.getHours()).padStart(2, '0');
-        const minute = parseInt(url.searchParams.get('minute') || String(now.getMinutes()));
-        
-        // 4. 공휴일 자동 감지 로직
-        const year = now.getFullYear();
-        const month = String(now.getMonth() + 1).padStart(2, '0');
-        const date = String(now.getDate()).padStart(2, '0');
-        const todayStr = `${year}-${month}-${date}`;
+        // 3. Load Secure Data
+        // STRATEGY: Global Cache -> Local -> GitHub (Timeout 3.5s) -> Hardcoded Fallback
+        let db = cachedDb;
 
-        if (DATA.metadata && DATA.metadata.holidays) {
-            if (DATA.metadata.holidays.includes(todayStr)) {
-                const week = ['일', '월', '화', '수', '목', '금', '토'];
-                const todayDayOfWeek = week[now.getDay()];
-                if (day === todayDayOfWeek) {
-                     day = '공휴일';
+        if (!db) {
+            const dataUrlLocal = `${url.origin}/data.json`;
+            const dataUrlGithub = "https://raw.githubusercontent.com/ns0408/gimpo-goldline/main/data.json";
+
+            // Helper for timeout
+            const fetchWithTimeout = (url, ms) => {
+                const controller = new AbortController();
+                const id = setTimeout(() => controller.abort(), ms);
+                return fetch(url, { signal: controller.signal }).then(r => {
+                    clearTimeout(id);
+                    return r;
+                }).catch(err => {
+                    clearTimeout(id);
+                    throw err;
+                });
+            };
+
+            try {
+                // Try Local First (Fastest if it works)
+                // Use 1500ms timeout for local
+                const localResp = await fetchWithTimeout(dataUrlLocal, 1500);
+                if (localResp.ok) {
+                    db = await localResp.json();
+                } else {
+                    throw new Error("Local load failed");
                 }
+            } catch (localErr) {
+                // console.warn("Local failed, trying GitHub...", localErr);
+                try {
+                    // Try GitHub with strict timeout (3500ms)
+                    const ghResp = await fetchWithTimeout(dataUrlGithub, 3500);
+                    if (ghResp.ok) {
+                        db = await ghResp.json();
+                    } else {
+                        throw new Error("GitHub load failed");
+                    }
+                } catch (ghErr) {
+                    // console.error("Critical: All network DB loads failed. Switching to EMERGENCY DRIVER.");
+                    db = FALLBACK_DB;
+                }
+            }
+            // Save to Cache
+            cachedDb = db;
+        }
+
+        // 4. CORE LOGIC
+        // If EMERGENCY_MODE is true, we calculate heuristic congestion
+        let finalCong = 0;
+        let count = 0;
+        let similarDays = [];
+        let mlVal = null;
+        let routeSegments = [];
+
+        if (db.EMERGENCY_MODE) {
+            // --- EMERGENCY HEURISTIC ---
+            // Peak: 7-9am (250%), 18-20pm (200%)
+            if (timeVal >= 7 && timeVal <= 9) finalCong = 240 + Math.random() * 20;
+            else if (timeVal >= 17 && timeVal <= 19) finalCong = 200 + Math.random() * 20;
+            else if (timeVal >= 10 && timeVal <= 16) finalCong = 50 + Math.random() * 20;
+            else finalCong = 10;
+
+            finalCong = Math.round(finalCong);
+
+            // Adjust for station position (Sequence: Yangchon -> Gimpo Airport)
+            const stations = ["양촌", "구래", "마산", "장기", "운양", "걸포북변", "사우", "풍무", "고촌", "김포공항"];
+            const stIdx = stations.indexOf(station.replace('역', ''));
+            // Traffic accumulates towards airport
+            if (stIdx > -1) {
+                const factor = (stIdx + 1) / stations.length;
+                finalCong = Math.round(finalCong * factor * 1.2);
+            }
+
+            // Generate Fake Route Segment for Vis
+            routeSegments = stations.map(s => ({
+                station: s,
+                pct: Math.min(280, Math.round(finalCong * (stations.indexOf(s) + 1) / 10)),
+                emoji: "🟡" // Generic
+            }));
+
+        } else {
+            // --- NORMAL DB LOGIC ---
+            const targetDate = new Date(dateVal);
+            const targetDow = targetDate.getDay();
+            const isTargetWeekend = (targetDow === 0 || targetDow === 6);
+            const targetMonth = targetDate.getMonth();
+            const targetWeather = params.get("weather") || "Clear";
+            const isTargetHoliday = params.get("holiday") === "true" || isTargetWeekend;
+
+            const historyKeys = Object.keys(db);
+
+            historyKeys.forEach(k => {
+                const dayData = db[k];
+                if (!dayData || !dayData.meta) return;
+                let score = 0;
+
+                const dataDow = (targetDow + 6) % 7;
+                if (dayData.meta.dow === dataDow) score += 50;
+
+                const dbIsHoliday = dayData.meta.holiday || dayData.meta.weekend;
+                if (dbIsHoliday === isTargetHoliday) score += 30;
+
+                if (dayData.meta.weather === targetWeather) score += 20;
+
+                const hMonth = new Date(k).getMonth();
+                if (hMonth === targetMonth) score += 10;
+                else if (Math.abs(hMonth - targetMonth) <= 1) score += 5;
+
+                similarDays.push({ date: k, score: score, data: dayData });
+            });
+
+            similarDays.sort((a, b) => b.score - a.score);
+            const top5 = similarDays.slice(0, 5);
+
+            let totalCong = 0;
+            // Calculate station specific congestion
+            top5.forEach(item => {
+                if (item.data.hourly && item.data.hourly[String(timeVal)]) {
+                    const hourlyData = item.data.hourly[String(timeVal)];
+                    const stData = hourlyData.find(s =>
+                        s.station === station || s.station === station.replace('역', '') || station.startsWith(s.station)
+                    );
+
+                    if (stData) {
+                        if (stData.cong <= 400) { // Outlier filter
+                            totalCong += stData.cong;
+                            count++;
+                        }
+                    }
+                }
+            });
+
+            // Route visualization
+            if (top5.length > 0 && top5[0].data.hourly && top5[0].data.hourly[String(timeVal)]) {
+                const bestHourParams = top5[0].data.hourly[String(timeVal)];
+                if (bestHourParams) {
+                    routeSegments = bestHourParams.map(s => ({
+                        station: s.station,
+                        pct: s.cong > 400 ? 0 : s.cong,
+                        emoji: s.cong > 80 ? "🔴" : (s.cong > 30 ? "🟡" : "🟢")
+                    }));
+                }
+            }
+
+            const avgCong = count > 0 ? Math.round(totalCong / count) : 0;
+            finalCong = avgCong;
+
+            // Ensemble ML
+            if (db[dateVal] && db[dateVal].ml_pred && db[dateVal].ml_pred[String(timeVal)]) {
+                const mlHourData = db[dateVal].ml_pred[String(timeVal)];
+                const cleanStation = station.replace('역', '');
+                const matchedKey = Object.keys(mlHourData).find(k => k === cleanStation || cleanStation.startsWith(k));
+                if (matchedKey) {
+                    mlVal = mlHourData[matchedKey];
+                }
+            }
+
+            if (mlVal !== null) {
+                finalCong = Math.round((mlVal * 0.6) + (avgCong * 0.4));
             }
         }
 
-        // 5. 유효성 검사
-        if (!station || !DATA.timetable[station]) {
-            return new Response(JSON.stringify({ success: false, message: 'Invalid station' }), { status: 400, headers: corsHeaders(origin) });
-        }
-        
-        // 해당 요일 데이터가 없으면 토요일/일요일 데이터로 대체 시도 (안전장치)
-        if (!DATA.usage[station][day]) {
-             if (['토', '일', '공휴일'].includes(day)) {
-                 // 데이터가 없는데 주말이라면, 혹시 '토'나 '일' 중 있는 것으로 대체
-                 if (DATA.usage[station]['토']) day = '토';
-                 else if (DATA.usage[station]['일']) day = '일';
-             }
-        }
+        // =========================================================================
+        // 7. HONEY TIP ENGINE (Real-Time + Deep Link)
+        // =========================================================================
+        let tipData = null;
 
-        if (!DATA.usage[station][day]) {
-            return new Response(JSON.stringify({ success: false, message: 'Data not found for this day' }), { status: 400, headers: corsHeaders(origin) });
-        }
+        const BUS_STATION_MAP = {
+            "풍무": { id: "233001456", routes: { "233000031": "70번", "233000003": "88번", "100100612": "서울02(출근)" }, name: "풍무역.트레이더스" },
+            "고촌": { id: "233000138", routes: { "233000031": "70번", "233000003": "88번", "100100612": "서울02(출근)" }, name: "고촌역" },
+            "사우": { id: "233000141", routes: { "233000031": "70번", "233000003": "88번", "100100612": "서울02(출근)" }, name: "사우역.김포고" },
+        };
 
-        // 6. 혼잡도 계산
-        const trains = findNext(station, direction, day, hour, minute, DATA);
-        
-        if (!trains || trains.length === 0) {
-            return new Response(JSON.stringify({ success: true, message: '운행 종료', data: [] }), { status: 200, headers: corsHeaders(origin) });
-        }
+        const EXTREME_CONGESTION = 150;
+        const HIGH_CONGESTION = 130;
+        const BUS_API_KEY = "076fe95cc0f5cdb0e84e4005e7349546816f968f6569c0ae64db2e216d6728c3";
 
-        const trainInfo = trains.map(train => {
-            const hourStr = String(train.h).padStart(2, '0');
-            const cong = calcCong(station, direction, day, hourStr, DATA);
-            return {
-                time: `${hourStr}:${String(train.m).padStart(2, '0')}`,
-                congestion: cong.pct,
-                level: getLv(cong.pct),
-                message: cong.msg
+        if (finalCong >= EXTREME_CONGESTION) {
+            const stKey = Object.keys(BUS_STATION_MAP).find(k => station.includes(k));
+            const busInfo = stKey ? BUS_STATION_MAP[stKey] : null;
+
+            let realTimeArrivals = [];
+
+            if (busInfo) {
+                try {
+                    const apiUrl = `https://apis.data.go.kr/6410000/busarrivalservice/v2/getBusArrivalListv2?serviceKey=${BUS_API_KEY}&stationId=${busInfo.id}`;
+                    // Use standard fetch for external API (Cloudflare workers usually handle external fetch fine)
+                    const busResp = await fetch(apiUrl);
+                    if (busResp.ok) {
+                        const xmlText = await busResp.text();
+                        const listMatches = xmlText.match(/<busArrivalList>([\s\S]*?)<\/busArrivalList>/g);
+                        if (listMatches) {
+                            listMatches.forEach(block => {
+                                const rId = block.match(/<routeId>(.*?)<\/routeId>/)?.[1];
+                                const pTime1 = block.match(/<predictTime1>(.*?)<\/predictTime1>/)?.[1];
+                                const pTime2 = block.match(/<predictTime2>(.*?)<\/predictTime2>/)?.[1];
+                                if (rId && busInfo.routes[rId] && pTime1) {
+                                    realTimeArrivals.push({
+                                        busName: busInfo.routes[rId],
+                                        time1: pTime1,
+                                        time2: pTime2 || null
+                                    });
+                                }
+                            });
+                        }
+                    }
+                } catch (e) {
+                    // ignore
+                }
+            }
+
+            if (realTimeArrivals.length > 0) {
+                tipData = {
+                    type: "REAL_TIME",
+                    msg: `🚍 70번 버스 도착 예정 정보 (${stKey}역 정류장)`,
+                    arrivals: realTimeArrivals
+                };
+            } else {
+                const fallbackId = busInfo ? busInfo.id : "233001456";
+                const fallbackRoute = "233000031";
+                const deepLinkUrl = `http://m.gbis.go.kr/search/StationArrivalVia.do?stationId=${fallbackId}&routeId=${fallbackRoute}`;
+                tipData = {
+                    type: "DEEP_LINK",
+                    msg: "🚍 현재 '극한 혼잡' 상태입니다! 70번 버스(당산행) 실시간 위치 확인하기",
+                    url: deepLinkUrl,
+                    btnText: "70번 버스 위치 확인"
+                };
+            }
+
+        } else if (finalCong >= HIGH_CONGESTION) {
+            tipData = {
+                type: "TIME_SHIFT",
+                msg: `💡 1시간 전/후 이용 시 혼잡도가 낮아질 수 있습니다.`
             };
+        }
+
+        // 8. FINAL RESPONSE
+        const result = {
+            success: true,
+            data: {
+                congestion: finalCong,
+                message: db.EMERGENCY_MODE ? "Emergency Mode Active" : "Ensemble Prediction Success",
+                context: {
+                    matchCount: count,
+                    topMatchDate: similarDays[0]?.date || "None",
+                    score: similarDays[0]?.score || 0,
+                    ml_pred: mlVal,
+                    knn_pred: finalCong,
+                    source: db.EMERGENCY_MODE ? "EMERGENCY_FALLBACK" : "LIVE_DB"
+                },
+                tip: tipData,
+                trains: [
+                    {
+                        time: { hour: timeVal, minute: 0 },
+                        congestion: {
+                            pct: finalCong,
+                            text: finalCong >= 130 ? "혼잡" : (finalCong >= 80 ? "보통" : "여유"),
+                            emoji: finalCong >= 130 ? "😱" : (finalCong >= 80 ? "😐" : "😊")
+                        },
+                        route: routeSegments
+                    }
+                ]
+            }
+        };
+
+        return new Response(JSON.stringify(result), {
+            headers: { ...corsHeaders, "Content-Type": "application/json" }
         });
 
-        return new Response(JSON.stringify({ success: true, data: { trains: trainInfo } }), { status: 200, headers: corsHeaders(origin) });
-
-    } catch (error) {
-        return new Response(JSON.stringify({ success: false, error: error.message }), { status: 500, headers: corsHeaders(origin) });
+    } catch (err) {
+        return new Response(JSON.stringify({ success: false, error: "System Crash: " + err.message }), {
+            status: 200,
+            headers: { ...corsHeaders, "Content-Type": "application/json" }
+        });
     }
-}
-
-// Helper Functions
-function findNext(station, direction, day, currentHour, currentMinute, DATA) {
-    const timetable = DATA.timetable[station][direction];
-    if (!timetable) return [];
-    
-    let timeKey = '평일';
-    if (['토', '일', '공휴일'].includes(day)) timeKey = '토일';
-    
-    const schedule = timetable[timeKey];
-    if (!schedule) return [];
-
-    let trains = [];
-    let h = parseInt(currentHour);
-    let m = currentMinute;
-    let count = 0;
-    
-    for (let i = 0; i < 3; i++) {
-        let hourKey = String(h).padStart(2, '0');
-        if (schedule[hourKey]) {
-            for (let t of schedule[hourKey]) {
-                if (t.minute > m || (i > 0)) {
-                    trains.push({ h: h, m: t.minute });
-                    count++;
-                    if (count >= 3) break;
-                }
-            }
-        }
-        if (count >= 3) break;
-        h++; m = -1; if (h > 24) break; 
-    }
-    return trains;
-}
-
-function calcCong(station, direction, day, hour, DATA) {
-    const usage = DATA.usage[station][day];
-    if (!usage || !usage[hour]) return { pct: 0, msg: "정보 없음" };
-    
-    const on = usage[hour]['승차'];
-    const off = usage[hour]['하차'];
-    const currentLoad = on - off;
-    let congestion = Math.round((Math.max(0, currentLoad) / 300) * 100);
-    if (congestion < 0) congestion = 0;
-    return { pct: congestion, msg: "" };
-}
-
-function getLv(pct) {
-    if (pct >= 150) return "지옥";
-    if (pct >= 100) return "매우 혼잡";
-    if (pct >= 70) return "혼잡";
-    if (pct >= 40) return "보통";
-    return "여유";
 }
