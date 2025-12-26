@@ -89,6 +89,19 @@ async function fetchRealWeather() {
     }
 }
 
+function getSimulatedWeather(h, m) {
+    if (window.CURRENT_WEATHER) {
+        const code = window.CURRENT_WEATHER.code;
+        const desc = WMO_CODES[code] || "맑음";
+        return {
+            temp: window.CURRENT_WEATHER.temp, // Real API Temp
+            icon: desc.split(' ').pop(),
+            description: desc
+        };
+    }
+    // [CRITICAL] No Fake Data Allowed. Return "Unknown" if API fails.
+    return { temp: 0, icon: '❓', description: '기상청 연결실패' };
+}
 function updateWeatherCard(prefix, data) {
     const code = data.weathercode;
     const desc = WMO_CODES[code] || "정보없음";
@@ -508,13 +521,21 @@ const LEVELS = [
 function getCongestionLevel(pct) { return LEVELS.find(l => pct <= l.t) || LEVELS[LEVELS.length - 1]; }
 function openTooltip() { document.getElementById('tooltipOverlay').style.display = 'block'; document.getElementById('tooltipPopup').style.display = 'block'; document.getElementById('tooltipPopup').classList.add('show'); }
 function closeTooltip() { document.getElementById('tooltipOverlay').style.display = 'none'; document.getElementById('tooltipPopup').style.display = 'none'; document.getElementById('tooltipPopup').classList.remove('show'); }
+// [Fix] Global Popup Management
 function showCongestionPopup(icon, name, desc, event) {
-    if (event) event.preventDefault();
+    // if (event) event.preventDefault(); // Removed to prevent scrolling issues
     const old = document.getElementById('tempPopup'); if (old) old.remove();
-    const popupHtml = `<div id="tempPopup" style="position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); background:#1B2838; border:2px solid #7DF9FF; border-radius:15px; padding:25px; width:85%; max-width:320px; text-align:center; box-shadow:0 0 30px rgba(0,0,0,0.8); z-index:9999; animation:popIn 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275); pointer-events:none;"><div style="font-size:64px; margin-bottom:10px;">${icon}</div><div style="font-size:28px; font-weight:900; color:#7DF9FF; margin-bottom:10px;">${name}</div><div style="font-size:15px; color:#F0F4F8; line-height:1.5; margin-bottom:15px;">${desc}</div><div style="font-size:11px; color:#B0BEC5; border-top:1px solid rgba(255,255,255,0.1); padding-top:10px;">손을 떼면 자동으로 닫힙니다</div></div><style>@keyframes popIn { from{transform:translate(-50%,-50%) scale(0.8); opacity:0;} to{transform:translate(-50%,-50%) scale(1); opacity:1;} }</style>`;
+    const popupHtml = `<div id="tempPopup" style="position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); background:#1B2838; border:2px solid #7DF9FF; border-radius:15px; padding:25px; width:85%; max-width:320px; text-align:center; box-shadow:0 0 30px rgba(0,0,0,0.8); z-index:9999; animation:popIn 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275); pointer-events:none;"><div style="font-size:64px; margin-bottom:10px;">${icon}</div><div style="font-size:28px; font-weight:900; color:#7DF9FF; margin-bottom:10px;">${name}</div><div style="font-size:15px; color:#F0F4F8; line-height:1.5; margin-bottom:15px;">${desc}</div><div style="font-size:11px; color:#B0BEC5; border-top:1px solid rgba(255,255,255,0.1); padding-top:10px;">손을 떼면 닫힙니다</div></div><style>@keyframes popIn { from{transform:translate(-50%,-50%) scale(0.8); opacity:0;} to{transform:translate(-50%,-50%) scale(1); opacity:1;} }</style>`;
     document.body.insertAdjacentHTML('beforeend', popupHtml);
+
+    // Add global listener to close on release anywhere
+    window.addEventListener('mouseup', hideCongestionPopup, { once: true });
+    window.addEventListener('touchend', hideCongestionPopup, { once: true });
 }
-function hideCongestionPopup() { const popup = document.getElementById('tempPopup'); if (popup) { popup.style.transition = 'opacity 0.2s, transform 0.2s'; popup.style.opacity = '0'; popup.style.transform = 'translate(-50%, -50%) scale(0.9)'; setTimeout(() => popup.remove(), 200); } }
+function hideCongestionPopup() {
+    const popup = document.getElementById('tempPopup');
+    if (popup) popup.remove();
+}
 
 async function init() {
     const hourSelect = document.getElementById('hour'); const minuteSelect = document.getElementById('minute'); const stSelect = document.getElementById('station');
