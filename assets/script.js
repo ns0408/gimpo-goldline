@@ -3,6 +3,16 @@
 // =============================================================================
 const API_URL = '/predict';
 
+// [보안] 우클릭 및 개발자 도구 차단
+document.addEventListener('contextmenu', e => e.preventDefault());
+document.addEventListener('keydown', e => {
+    if (e.key === 'F12' ||
+        (e.ctrlKey && e.shiftKey && (e.key === 'I' || e.key === 'J' || e.key === 'C')) ||
+        (e.ctrlKey && e.key === 'U')) {
+        e.preventDefault();
+    }
+});
+
 // =============================================================================
 // [설정] 외부 데이터 연결
 // =============================================================================
