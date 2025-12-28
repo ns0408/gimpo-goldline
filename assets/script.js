@@ -378,12 +378,19 @@ function updatePremiumUI(st, dir, day, h, m, data) {
     const findRowMinutes = (targetH) => {
         if (typeof SCHEDULE_DATA === 'undefined') return [];
         const searchDay = (day === '토' || day === '일') ? '토요일' : '평일';
-        const row = SCHEDULE_DATA.find(r =>
-            r['역이름'] === st &&
-            r['요일'].includes(searchDay) &&
-            parseInt(r['시간']) === parseInt(targetH) &&
-            (r['방향'].includes(dir.split(' ')[0]) || dir.includes(r['방향'].split(' ')[0]))
-        );
+        const row = SCHEDULE_DATA.find(r => {
+            if (r['역이름'] !== st) return false;
+            if (!r['요일'].includes(searchDay)) return false;
+            if (parseInt(r['시간']) !== parseInt(targetH)) return false;
+
+            // [Fix] Direction Matching Logic
+            // "양촌역방면" 선택 시 -> "양촌행" & "구래행" 모두 포함해야 함
+            if (dir.includes("김포공항")) {
+                return r['방향'].includes("김포공항");
+            } else {
+                return r['방향'].includes("양촌") || r['방향'].includes("구래");
+            }
+        });
         if (!row || !row['분']) return [];
         return row['분'].trim().split(/\s+/).map(v => {
             const numStr = v.replace(/[^0-9]/g, '');
