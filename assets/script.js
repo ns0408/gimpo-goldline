@@ -218,8 +218,8 @@ async function analyze() {
 
             // 예보 날씨 코드를 모델 타입으로 변환
             let wType = "Clear";
-            if (wInfo.desc.includes("비")) wType = "Rain";
-            if (wInfo.desc.includes("눈")) wType = "Snow";
+            if (wInfo && wInfo.description && wInfo.description.includes("비")) wType = "Rain";
+            if (wInfo && wInfo.description && wInfo.description.includes("눈")) wType = "Snow";
 
             try {
                 const base = MODEL_CONSTANTS.BASE_LOAD[station][dayType][hour] || { b: 200, a: 100 };
