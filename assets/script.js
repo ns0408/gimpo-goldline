@@ -248,7 +248,18 @@ async function analyze() {
             try {
                 const base = MODEL_CONSTANTS.BASE_LOAD[station][dayType][hour] || { b: 200, a: 100 };
                 const mFactor = MODEL_CONSTANTS.SEASON_FACTORS[new Date().getMonth() + 1] || 1.0;
-                const wFactor = MODEL_CONSTANTS.WEATHER_FACTORS[wType] || 1.0;
+
+                // [NEW] Time-based Weather Factor (Aus/Peak vs Off)
+                // 출근(06:30~08:30) -> 6,7,8시 / 퇴근(17:30~19:30) -> 17,18,19시
+                const isPeak = (hour >= 6 && hour <= 8) || (hour >= 17 && hour <= 19);
+                const period = isPeak ? "Peak" : "Off";
+                let wFactor = 1.0;
+
+                if (MODEL_CONSTANTS.WEATHER_FACTORS[wType] && typeof MODEL_CONSTANTS.WEATHER_FACTORS[wType] === 'object') {
+                    wFactor = MODEL_CONSTANTS.WEATHER_FACTORS[wType][period] || MODEL_CONSTANTS.WEATHER_FACTORS[wType] || 1.0;
+                } else {
+                    wFactor = MODEL_CONSTANTS.WEATHER_FACTORS[wType] || 1.0;
+                }
 
                 return {
                     board: Math.round(base.b * mFactor * wFactor),
