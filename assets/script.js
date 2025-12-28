@@ -445,12 +445,23 @@ function updatePremiumUI(st, dir, day, h, m, data) {
                 <div style="color:#1B2838; font-size:12px; font-weight:600;">장기역 시발 열차(텅 빈 차)가 옵니다. 100% 앉아서 가실 수 있습니다.</div></div>`;
     }
 
-    // 버스 정보 (User's Original Logic)
+    // Use the ML engine (calculateGoldlineCongestion) -- Checked Early for Bus Info & Map
+    const { loads: loadMap, queues: queueMap } = calculateGoldlineCongestion(h, dir, day);
+
+    // 버스 정보 (User's Original Logic) - Updated to 130% & Linked to AI Model
     let isCrowded = false;
-    if (data.routeSegments && data.routeSegments.length > 0) {
-        const maxCong = Math.max(...data.routeSegments.map(s => s.congestion));
-        if (maxCong >= 150) isCrowded = true;
-    } else if (data.congestion >= 150) isCrowded = true;
+    let maxCalcCong = 0;
+    const routeListForBus = ROUTES[dir] || ROUTES["김포공항방면"];
+
+    routeListForBus.forEach(s => {
+        if (loadMap[s]) {
+            const tCount = getTrainCount(s, h, day);
+            const cong = (loadMap[s] / tCount / CAPACITY) * 100;
+            if (cong > maxCalcCong) maxCalcCong = cong;
+        }
+    });
+
+    if (maxCalcCong >= 130) isCrowded = true;
 
     const busInfo = (typeof BUS_DATA !== 'undefined') ? BUS_DATA[st] : null;
     if (isCrowded && busInfo && busInfo.targetRoutes) {
@@ -488,7 +499,7 @@ function updatePremiumUI(st, dir, day, h, m, data) {
     html += '<div class="train-card"><div style="display:flex; justify-content:center; align-items:center; color:#7DF9FF; font-weight:700; margin-bottom:15px;">📊 구간별 평균혼잡도<span class="info-icon" onclick="openTooltip()" style="margin-left:8px; cursor:pointer;" title="설명 보기">?</span></div>';
 
     // Use the ML engine (calculateGoldlineCongestion)
-    const { loads: loadMap, queues: queueMap } = calculateGoldlineCongestion(h, dir, day);
+    // const { loads: loadMap, queues: queueMap } = calculateGoldlineCongestion(h, dir, day);
 
     html += '<div class="journey-map-wrapper"><div class="journey-map">';
     for (let i = startIdx; i < routeList.length - 1; i++) {
