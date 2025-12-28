@@ -68,39 +68,63 @@ function getWeatherForSelection(dayStr) {
 // =============================================================================
 const WMO_CODES = { 0: '맑음 ☀️', 1: '대체로 맑음 🌤️', 2: '약간 흐림 ⛅', 3: '흐림 ☁️', 45: '안개 🌫️', 51: '이슬비 🌧️', 61: '비 ☔', 71: '눈 ☃️', 95: '천둥번개 ⚡' };
 
-// [Weather] 7-Day Forecast (Open-Meteo)
+// [Weather] 7-Day Forecast & Air Quality
 async function fetchRealWeather() {
-    console.log("[날씨] 7일 예보 데이터 요청 중...");
+    console.log("[날씨] 데이터 요청 중...");
     const set = (id, txt) => { const el = document.getElementById(id); if (el) el.innerText = txt; };
     set('kimpoDesc', '로딩..'); set('seoulDesc', '로딩..');
 
     try {
-        // [Upgrade] Fetch Hourly Forecast for 7 days
-        const [resK, resS] = await Promise.all([
+        const [resK, resS, resD] = await Promise.all([
             fetch("https://api.open-meteo.com/v1/forecast?latitude=37.615&longitude=126.715&current_weather=true&hourly=temperature_2m,weathercode&timezone=Asia%2FSeoul"),
-            fetch("https://api.open-meteo.com/v1/forecast?latitude=37.550&longitude=126.849&current_weather=true&hourly=temperature_2m,weathercode&timezone=Asia%2FSeoul")
+            fetch("https://api.open-meteo.com/v1/forecast?latitude=37.550&longitude=126.849&current_weather=true&hourly=temperature_2m,weathercode&timezone=Asia%2FSeoul"),
+            fetch("https://air-quality-api.open-meteo.com/v1/air-quality?latitude=37.615&longitude=126.715&current=pm10,pm2_5")
         ]);
 
         if (!resK.ok || !resS.ok) throw new Error("API Error");
 
         const dataK = await resK.json();
         const dataS = await resS.json();
+        const dataD = resD.ok ? await resD.json() : null;
 
-        // UI Update (Current)
-        updateWeatherCard('kimpo', dataK.current_weather);
-        updateWeatherCard('seoul', dataS.current_weather);
+        const dustInfo = dataD ? dataD.current : null;
 
-        // Save Global Forecast Data (Gimpo)
+        // UI Update (Current + Dust)
+        updateWeatherCard('kimpo', dataK.current_weather, dustInfo);
+        updateWeatherCard('seoul', dataS.current_weather, dustInfo); // Use same dust for Seoul approx
+
         window.HOURLY_FORECAST = {
             times: dataK.hourly.time,
             temps: dataK.hourly.temperature_2m,
             codes: dataK.hourly.weathercode
         };
-        console.log("[날씨] 7일치 예보 저장 완료");
 
     } catch (e) {
         console.error("[날씨] 로드 실패:", e);
         set('kimpoDesc', '정보없음'); set('seoulDesc', '정보없음');
+    }
+}
+
+function updateWeatherCard(prefix, data, dust) {
+    const code = data.weathercode;
+    const desc = WMO_CODES[code] || "정보없음";
+    const icon = desc.split(' ').pop();
+    const elTemp = document.getElementById(prefix + 'Temp');
+
+    let label = desc;
+    if (dust) {
+        const pm10 = dust.pm10;
+        let dustLv = '좋음';
+        if (pm10 > 30) dustLv = '보통';
+        if (pm10 > 80) dustLv = '나쁨';
+        if (pm10 > 150) dustLv = '매우나쁨';
+        label += ` / 미세먼지 ${dustLv}(${pm10})`;
+    }
+
+    if (elTemp) {
+        elTemp.innerText = `${data.temperature}°C`;
+        document.getElementById(prefix + 'Desc').innerText = label;
+        document.getElementById(prefix + 'Icon').innerText = icon;
     }
 }
 
@@ -268,7 +292,7 @@ function updatePremiumUI(st, dir, day, h, m, data) {
     };
 
     const CAPACITY = 172;
-    const MAX_CAPACITY = 300;
+    const MAX_CAPACITY = 240;
 
     // Simulation Engine (ML Integrated)
     const calculateGoldlineCongestion = (targetH, direction, dayOfWeek) => {
@@ -321,7 +345,7 @@ function updatePremiumUI(st, dir, day, h, m, data) {
     };
 
     const getBoardingMessage = (qCount) => {
-        const TRAIN_CAPACITY = 300;
+        const TRAIN_CAPACITY = 240;
         const MIN_HEADWAY = 3;
         const MAX_HEADWAY = 4;
         if (!qCount || qCount <= 0) {
@@ -528,7 +552,7 @@ async function renderInsights() {
                     <div style="font-size:11px; color:#B0BEC5; line-height:1.4; margin-bottom:8px;">${item.summary}</div>
                     <div style="display:flex; justify-content:space-between; align-items:center;">
                         <span style="font-size:10px; color:#666;">${item.date}</span>
-                        <a href="${item.blog_link}" target="_blank" style="font-size:11px; color:#FFD700; text-decoration:none;">자세히 보기 →</a>
+                        <a href="${item.blog_link || item.link || item.url || '#'}" target="_blank" style="font-size:11px; color:#FFD700; text-decoration:none;">자세히 보기 →</a>
                     </div></div>`;
         });
         html += `</div></div>`;
