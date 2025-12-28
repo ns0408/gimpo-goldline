@@ -68,40 +68,97 @@ function getWeatherForSelection(dayStr) {
 // =============================================================================
 const WMO_CODES = { 0: '맑음 ☀️', 1: '대체로 맑음 🌤️', 2: '약간 흐림 ⛅', 3: '흐림 ☁️', 45: '안개 🌫️', 51: '이슬비 🌧️', 61: '비 ☔', 71: '눈 ☃️', 95: '천둥번개 ⚡' };
 
+// [Weather] 7-Day Forecast (Open-Meteo)
 async function fetchRealWeather() {
-    // 앱 초기화 시 화면에 보여주는 용도 (기존 유지)
+    console.log("[날씨] 7일 예보 데이터 요청 중...");
+    const set = (id, txt) => { const el = document.getElementById(id); if (el) el.innerText = txt; };
+    set('kimpoDesc', '로딩..'); set('seoulDesc', '로딩..');
+
     try {
+        // [Upgrade] Fetch Hourly Forecast for 7 days
         const [resK, resS] = await Promise.all([
-            fetch("https://api.open-meteo.com/v1/forecast?latitude=37.615&longitude=126.715&current_weather=true"),
-            fetch("https://api.open-meteo.com/v1/forecast?latitude=37.550&longitude=126.849&current_weather=true")
+            fetch("https://api.open-meteo.com/v1/forecast?latitude=37.615&longitude=126.715&current_weather=true&hourly=temperature_2m,weathercode&timezone=Asia%2FSeoul"),
+            fetch("https://api.open-meteo.com/v1/forecast?latitude=37.550&longitude=126.849&current_weather=true&hourly=temperature_2m,weathercode&timezone=Asia%2FSeoul")
         ]);
+
         if (!resK.ok || !resS.ok) throw new Error("API Error");
 
         const dataK = await resK.json();
         const dataS = await resS.json();
 
+        // UI Update (Current)
         updateWeatherCard('kimpo', dataK.current_weather);
         updateWeatherCard('seoul', dataS.current_weather);
 
-        window.CURRENT_WEATHER = { temp: dataK.current_weather.temperature, code: dataK.current_weather.weathercode };
+        // Save Global Forecast Data (Gimpo)
+        window.HOURLY_FORECAST = {
+            times: dataK.hourly.time,
+            temps: dataK.hourly.temperature_2m,
+            codes: dataK.hourly.weathercode
+        };
+        console.log("[날씨] 7일치 예보 저장 완료");
+
     } catch (e) {
-        // 실패 시 조용히 넘어감 (화면엔 '로딩..' 유지되거나 기본값)
+        console.error("[날씨] 로드 실패:", e);
+        set('kimpoDesc', '정보없음'); set('seoulDesc', '정보없음');
     }
 }
 
+// [Logic] Find Forecast for Target Day & Hour
 function getSimulatedWeather(h, m) {
-    if (window.CURRENT_WEATHER) {
-        const code = window.CURRENT_WEATHER.code;
-        const desc = WMO_CODES[code] || "맑음";
-        return {
-            temp: window.CURRENT_WEATHER.temp, // Real API Temp
-            icon: desc.split(' ').pop(),
-            description: desc
-        };
+    if (!window.HOURLY_FORECAST) {
+        return { temp: 0, icon: '❓', description: '기상청 연결실패' };
     }
-    // [CRITICAL] No Fake Data Allowed. Return "Unknown" if API fails.
-    return { temp: 0, icon: '❓', description: '기상청 연결실패' };
+
+    try {
+        let targetDayStr = '오늘';
+        const dayEl = document.getElementById('dayOfWeek');
+        if (dayEl) targetDayStr = dayEl.value;
+
+        const targetHour = parseInt(h);
+
+        // Map Korean Day to 0(Sun)~6(Sat)
+        const dayMap = { '일': 0, '월': 1, '화': 2, '수': 3, '목': 4, '금': 5, '토': 6 };
+        if (targetDayStr === '평일') targetDayStr = '월'; // Default to Mon
+        if (targetDayStr === '주말') targetDayStr = '토'; // Default to Sat
+
+        let targetDayIdx = dayMap[targetDayStr];
+        if (targetDayIdx === undefined) {
+            // Try to fuzzy match
+            if (targetDayStr.includes('토') || targetDayStr.includes('일')) targetDayIdx = 6;
+            else targetDayIdx = 1;
+        }
+
+        const times = window.HOURLY_FORECAST.times;
+        const now = new Date();
+
+        let foundIdx = -1;
+        for (let i = 0; i < times.length; i++) {
+            const tDate = new Date(times[i]);
+            if (tDate.getDay() === targetDayIdx && tDate.getHours() === targetHour) {
+                if (tDate >= now || (now - tDate) < 24 * 3600 * 1000) {
+                    foundIdx = i;
+                    break;
+                }
+            }
+        }
+
+        if (foundIdx !== -1) {
+            const t = window.HOURLY_FORECAST.temps[foundIdx];
+            const c = window.HOURLY_FORECAST.codes[foundIdx];
+            const d = WMO_CODES[c] || "정보없음";
+            return {
+                temp: t,
+                icon: d.split(' ').pop(),
+                description: d
+            };
+        }
+        return { temp: 0, icon: '❓', description: '예보범위 초과' };
+    } catch (e) {
+        return { temp: 0, icon: '❓', description: '예측오류' };
+    }
 }
+
 function updateWeatherCard(prefix, data) {
     const code = data.weathercode;
     const desc = WMO_CODES[code] || "정보없음";
@@ -139,13 +196,16 @@ async function analyze() {
         // [수정] API 호출 대신 로컬 계산 사용 (속도 향상 및 7일 예보 적용)
         await new Promise(r => setTimeout(r, 50)); // UI 반응용 딜레이
 
-        // 1. 선택한 요일의 7일 예보 가져오기
-        const wInfo = getWeatherForSelection(day);
+        // 1. Get Forecast
+        let wInfo = null;
+        if (typeof getSimulatedWeather === 'function') {
+            wInfo = getSimulatedWeather(h, m);
+        }
 
-        // 2. 가상의 데이터 객체 생성 (기존 updatePremiumUI가 받던 형식 준수)
+        // 2. Mock Data Wrapper
         const simData = {
-            weather: { temp: 20, icon: wInfo.icon, description: wInfo.desc }, // 예보 적용
-            congestion: 0, // 내부에서 재계산됨
+            weather: wInfo,
+            congestion: 0,
             routeSegments: []
         };
 
@@ -366,7 +426,7 @@ function updatePremiumUI(st, dir, day, h, m, data) {
     html += `<div class="weather-section" style="margin-top:10px; padding:10px; border-radius:10px; background:rgba(125,249,255,0.05);">`;
     html += `<div style="color:#7DF9FF; font-weight:700; margin-bottom:5px;">🌤️ 예측 날씨</div>`;
     html += `<div style="font-size:24px;">${weather.icon} ${weather.temp}°C · ${weather.description}</div>`; // 온도는 단순 표시, 상태가 중요
-    html += `<div style="font-size:12px; color:#FFD700; margin-top:4px;">📍 ${st} (${h}시 ${m}분 기준) 예측</div>`;
+    html += `<div style="font-size:12px; color:#FFD700; margin-top:4px;">📍 ${st} (${day}요일 ${h}시 ${m}분 기준) 예측</div>`;
     html += `</div></div>`;
 
     // 4. 구간 혼잡도
