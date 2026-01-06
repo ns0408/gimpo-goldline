@@ -121,7 +121,7 @@ def run_extraction():
     # 3. 데이터 분석 (기존 로직 유지)
     base_data = {} 
     monthly_totals = {}
-    weather_totals = {} 
+    weather_totals = { "Peak": {}, "Off": {} } # [NEW] 시간대별 분리 
     
     for fpath in csv_files:
         try:
@@ -145,6 +145,12 @@ def run_extraction():
                         try: board = int(row.iloc[col_idx]); alight = int(row.iloc[col_idx+1])
                         except: board=0; alight=0
                         
+                        # [Correction] Removed hardcoded 5.0x multiplier. Now using Bathtub Theory post-processing.
+                        if False: # Legacy Code
+                            if station == '김포공항':
+                                board = int(board * 5.0)
+                                alight = int(alight * 5.0)
+                        
                         if hour not in base_data[station][day_type]:
                             base_data[station][day_type][hour] = {'b': [], 'a': []}
                         base_data[station][day_type][hour]['b'].append(board)
@@ -152,8 +158,14 @@ def run_extraction():
                         
                         if dt.month not in monthly_totals: monthly_totals[dt.month] = []
                         monthly_totals[dt.month].append(board)
-                        if weather not in weather_totals: weather_totals[weather] = []
-                        weather_totals[weather].append(board)
+                        
+                        # [NEW] 시간대별 날씨 영향 분리 (Peak vs Off)
+                        # 출근(06:30~08:30) -> 6,7,8시 / 퇴근(17:30~19:30) -> 17,18,19시
+                        is_peak = (6 <= hour <= 8) or (17 <= hour <= 19)
+                        period = "Peak" if is_peak else "Off"
+                        
+                        if weather not in weather_totals[period]: weather_totals[period][weather] = []
+                        weather_totals[period][weather].append(board)
                         
                         col_idx += 2
                 except: continue
@@ -170,13 +182,54 @@ def run_extraction():
                 avg_a = sum(vals['a'])/len(vals['a']) if vals['a'] else 0
                 base_load_final[st][dtype][h] = {'b': round(avg_b), 'a': round(avg_a)}
 
+    # [Bathtub Theory] Gimpo Airport Boarding = Sum(Others Alighting)
+    # Reason: Gimpo Airport boarding data is missing transfer passengers. 
+    # Logic: In a closed system, total alighting at other stations must have originated from Gimpo (for the return leg).
+    for dtype in ['Workday', 'Holiday']:
+        # Assuming hours 5 to 0 (24h coverage)
+        all_hours = set()
+        for h_map in base_load_final.values():
+             if dtype in h_map: all_hours.update(h_map[dtype].keys())
+        
+        for h in all_hours:
+            total_alight_others = 0
+            for st in base_load_final:
+                if st == '김포공항': continue
+                if dtype in base_load_final[st] and h in base_load_final[st][dtype]:
+                    total_alight_others += base_load_final[st][dtype][h]['a']
+            
+            # Apply to Gimpo Airport
+            if '김포공항' in base_load_final and dtype in base_load_final['김포공항']:
+                # Ensure hour key exists
+                if h not in base_load_final['김포공항'][dtype]:
+                    base_load_final['김포공항'][dtype][h] = {'b': 0, 'a': 0}
+                
+                # Overwrite Boarding
+                base_load_final['김포공항'][dtype][h]['b'] = total_alight_others
+
     yearly_avg = sum(sum(vs) for vs in monthly_totals.values()) / sum(len(vs) for vs in monthly_totals.values()) if monthly_totals else 1
     seasonal_factors = {m: round((sum(monthly_totals[m])/len(monthly_totals[m])) / yearly_avg, 2) for m in monthly_totals} if monthly_totals else {}
     for m in range(1,13): 
         if m not in seasonal_factors: seasonal_factors[m] = 1.0
 
-    base_w_avg = sum(weather_totals["Clear"]) / len(weather_totals["Clear"]) if "Clear" in weather_totals else 1.0
-    weather_factors = {w: round((sum(vs)/len(vs))/base_w_avg, 2) for w, vs in weather_totals.items()}
+    # [NEW] 시간대별 날씨 계수 산출
+    weather_factors = {}
+    all_weather_types = set(list(weather_totals["Peak"].keys()) + list(weather_totals["Off"].keys()))
+    
+    for w in all_weather_types:
+        weather_factors[w] = {}
+        for p in ["Peak", "Off"]:
+            # 해당 시간대(p)의 'Clear' 평균 구하기 (기준점)
+            base_list = weather_totals[p].get("Clear", [])
+            base_avg = sum(base_list)/len(base_list) if base_list else 1.0
+            
+            # 해당 날씨(w)의 평균 구하기
+            target_list = weather_totals[p].get(w, [])
+            target_avg = sum(target_list)/len(target_list) if target_list else base_avg
+            
+            # 계수 = (특정날씨 평균 / 맑은날 평균)
+            factor = round(target_avg / base_avg, 2)
+            weather_factors[w][p] = factor
 
     # 4. 저장 (FORECAST 포함)
     output_obj = {

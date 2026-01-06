@@ -317,7 +317,28 @@ function updatePremiumUI(st, dir, day, h, m, data) {
 
     // Simulation Engine (ML Integrated)
     const calculateGoldlineCongestion = (targetH, direction, dayOfWeek) => {
-        const stations = ROUTES[direction] || ROUTES["김포공항방면"];
+        // [AI Logic] Order Guarantee
+        // 1. Get stations based on direction
+        let stations = ROUTES[direction] || ROUTES["김포공항방면"];
+
+        // 2. [New] Verify Order for Down Line (Gimpo -> Yangchon)
+        // If direction involves 'Yangchon'/'Gurae' (Down), ensure Gimpo is first.
+        // Based on ROUTES definition:
+        // "김포공항방면": ["양촌", ..., "김포공항"] (Up)
+        // "양촌역방면": ["김포공항", ..., "양촌"] (Down)
+        // Explicitly Check & Reverse if needed to ensure correct flow
+        // Logic: For "Down" (Yangchon Bound), first station must be Gimpo Airport.
+        if (direction.includes("양촌") || direction.includes("구래")) {
+            if (stations[0] !== "김포공항") {
+                stations = [...stations].reverse(); // Create copy and reverse
+            }
+        } else {
+            // For "Up" (Airport Bound), first station must be Yangchon (or Gurae)
+            if (stations[0] === "김포공항") {
+                stations = [...stations].reverse();
+            }
+        }
+
         let finalLoads = {}, finalQueues = {}, stationQueues = {};
         stations.forEach(s => stationQueues[s] = 0);
 
@@ -326,23 +347,71 @@ function updatePremiumUI(st, dir, day, h, m, data) {
 
         for (let simH = 5; simH <= targetH; simH++) {
             let currentOnboard = 0;
-            // Direction Heuristic (User Request: 95% AM / 95% PM / 50% Off-peak)
-            let baseDirRatio = 0.50; // Default 50:50
+            // [AI Logic] Directional Weight with Station Overrides
+            const WORKDAY_RATIO = {
+                5: 0.90, 6: 0.95, 7: 0.95, 8: 0.95, 9: 0.80,
+                10: 0.60, 11: 0.60, 12: 0.60, 13: 0.60, 14: 0.60, 15: 0.60,
+                16: 0.55, 17: 0.25, 18: 0.05, 19: 0.05, 20: 0.10,
+                21: 0.15, 22: 0.10, 23: 0.05, 0: 0.05, 1: 0.00
+            };
+            const HOLIDAY_RATIO = {
+                5: 0.60, 6: 0.60, 7: 0.60, 8: 0.65, 9: 0.70,
+                10: 0.70, 11: 0.75, 12: 0.70, 13: 0.65, 14: 0.60,
+                15: 0.50,
+                16: 0.40, 17: 0.30, 18: 0.25, 19: 0.20, 20: 0.20,
+                21: 0.15, 22: 0.10, 23: 0.05, 0: 0.00, 1: 0.00
+            };
 
+            let baseDirRatio = 0.5;
             if (dayType === 'Workday') {
-                if (simH >= 5 && simH <= 9) baseDirRatio = 0.95; // AM Peak: 95% to Airport (Extended 05~09)
-                else if (simH >= 17 && simH <= 21) baseDirRatio = 0.05; // PM Peak: 95% to Yangchon (Extended 17~21)
+                if (WORKDAY_RATIO[simH] !== undefined) baseDirRatio = WORKDAY_RATIO[simH];
+            } else {
+                if (HOLIDAY_RATIO[simH] !== undefined) baseDirRatio = HOLIDAY_RATIO[simH];
             }
 
             const isToAirportDirection = direction.includes("김포공항");
-            const effectiveDirRatio = isToAirportDirection ? baseDirRatio : (1.0 - baseDirRatio);
+            let effectiveDirRatio = isToAirportDirection ? baseDirRatio : (1.0 - baseDirRatio);
 
-            stations.forEach(st => {
+            // 2. Station Overrides (Physical End Points)
+            const isDownStart = (stations[0] === '김포공항' && !isToAirportDirection); // Start of Down line
+            const isUpStart = (stations[0] === '양촌' || stations[0] === '구래') && isToAirportDirection; // Start of Up line
+
+            // Logic: At the physical start station of the line, 100% of passengers board this train.
+            if (isDownStart || isUpStart) {
+                // But wait, the loop variable 'st' changes. We need to check 'st'.
+            }
+
+            stations.forEach((st, idx) => {
+                // Check if this station is the "Start" relative to this trip
+                // For Down Line: Gimpo is start. For Up Line: Yangchon is start.
+                let isStartStation = (idx === 0);
+
+                if (isStartStation) {
+                    effectiveDirRatio = 1.0; // Force 100% Boarding at Start
+                } else {
+                    // Reset ratio for intermediate stations
+                    effectiveDirRatio = isToAirportDirection ? baseDirRatio : (1.0 - baseDirRatio);
+
+                    // Specific Logic for Gurae (Up Direction)
+                    // If we are at Gurae and going up, it is effectively a start for many.
+                    if (st === '구래' && isToAirportDirection) effectiveDirRatio = 1.0;
+
+                    // Specific Logic for Gimpo (Down Direction) 
+                    // Already handled by isStartStation logic if stations[0] is Gimpo
+                }
+
                 const rawRidership = (window.getRidership) ? window.getRidership(st, simH) : { board: 200, alight: 200 };
+
+                // [Logic 3] Reset Alighting at Start Station
+                let alightCount = rawRidership.alight;
+                if (isStartStation) alightCount = 0; // Nobody alights at the very first station of the trip
+
                 let newBoardingDemand = rawRidership.board * effectiveDirRatio * 1.25;
                 let totalBoardingDemand = newBoardingDemand + stationQueues[st];
 
-                let alightingPassengers = Math.min(rawRidership.alight * effectiveDirRatio, currentOnboard);
+                let alightingPassengers = Math.min(alightCount * effectiveDirRatio, currentOnboard);
+                // Correction: If start station, alighting is 0 forced above.
+
                 let remainingOnboard = currentOnboard - alightingPassengers;
 
                 let trainCount = getTrainCount(st, simH, dayOfWeek);
