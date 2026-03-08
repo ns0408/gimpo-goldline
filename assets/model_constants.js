@@ -2000,25 +2000,25 @@ const MODEL_CONSTANTS = {
             "Peak": 0.9,
             "Off": 0.97
         },
-        "Clear": {
-            "Peak": 1.0,
-            "Off": 1.0
-        },
         "Snow": {
             "Peak": 0.88,
             "Off": 0.96
+        },
+        "Clear": {
+            "Peak": 1.0,
+            "Off": 1.0
         }
     },
     "FORECAST": {
-        "2026-03-08": "Clear",
         "2026-03-09": "Clear",
         "2026-03-10": "Clear",
         "2026-03-11": "Clear",
         "2026-03-12": "Clear",
         "2026-03-13": "Clear",
-        "2026-03-14": "Clear"
+        "2026-03-14": "Clear",
+        "2026-03-15": "Clear"
     },
     "META": {
-        "updated_at": "2026-03-07 19:22:16"
+        "updated_at": "2026-03-08 19:23:52"
     }
 };
