@@ -1996,13 +1996,13 @@ const MODEL_CONSTANTS = {
         "8": 0.95
     },
     "WEATHER_FACTORS": {
-        "Snow": {
-            "Peak": 0.88,
-            "Off": 0.96
-        },
         "Clear": {
             "Peak": 1.0,
             "Off": 1.0
+        },
+        "Snow": {
+            "Peak": 0.88,
+            "Off": 0.96
         },
         "Rain": {
             "Peak": 0.9,
@@ -2010,15 +2010,15 @@ const MODEL_CONSTANTS = {
         }
     },
     "FORECAST": {
-        "2026-05-21": "Rain",
         "2026-05-22": "Clear",
-        "2026-05-23": "Clear",
+        "2026-05-23": "Rain",
         "2026-05-24": "Clear",
         "2026-05-25": "Clear",
         "2026-05-26": "Rain",
-        "2026-05-27": "Rain"
+        "2026-05-27": "Rain",
+        "2026-05-28": "Rain"
     },
     "META": {
-        "updated_at": "2026-05-20 20:58:35"
+        "updated_at": "2026-05-21 20:50:41"
     }
 };
